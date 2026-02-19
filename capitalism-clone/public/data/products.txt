@@ -1,0 +1,51 @@
+# Product Definitions - MacroMogul Enhanced
+# Format: ID\tName\tCategory\tBasePrice\tBaseDemand\tUnitWeight\tPerishable\tQualitySensitive\tTechLevel\tExpertiseRequired\tKnowledgePoints\tInnovationRate
+# Categories: RAW=Raw Material, INTERMEDIATE=Intermediate Good, CONSUMER=Consumer Product
+# TechLevel: 1-10 (Higher = more advanced, more prone to disruption)
+# ExpertiseRequired: 0-100 (Points needed in product class expertise)
+# KnowledgePoints: 0-50 (R&D points required to unlock)
+# InnovationRate: 0.0-1.0 (Speed of tech obsolescence)
+
+ID	Name	Category	BasePrice	BaseDemand	UnitWeight	Perishable	QualitySensitive	TechLevel	ExpertiseRequired	KnowledgePoints	InnovationRate
+1	Wheat	RAW	10	100	1	false	false	1	0	0	0.0
+2	Corn	RAW	8	80	1	false	false	1	0	0	0.0
+3	Cotton	RAW	15	60	1	false	false	1	5	2	0.1
+4	Iron Ore	RAW	20	50	2	false	false	2	0	0	0.0
+5	Oil	RAW	30	40	2	false	false	2	10	5	0.15
+6	Timber	RAW	12	70	2	false	false	1	0	0	0.0
+7	Flour	INTERMEDIATE	25	90	1	false	true	2	10	3	0.05
+8	Fabric	INTERMEDIATE	40	60	1	false	true	3	20	5	0.1
+9	Steel	INTERMEDIATE	50	45	3	false	false	4	15	8	0.08
+10	Plastic	INTERMEDIATE	35	55	1	false	false	5	30	10	0.2
+11	Lumber	INTERMEDIATE	28	65	2	false	false	2	5	2	0.05
+12	Bread	CONSUMER	40	120	1	true	true	2	15	4	0.05
+13	Clothing	CONSUMER	80	100	1	false	true	3	25	6	0.12
+14	Furniture	CONSUMER	150	40	5	false	true	3	20	8	0.08
+15	Electronics	CONSUMER	300	30	1	false	true	8	60	25	0.35
+16	Toys	CONSUMER	50	80	1	false	true	4	20	5	0.15
+17	Books	CONSUMER	25	60	1	false	true	3	15	4	0.1
+18	Jewelry	CONSUMER	500	20	1	false	true	5	40	15	0.08
+19	Cars	CONSUMER	20000	5	1000	false	true	9	80	40	0.25
+20	Computers	CONSUMER	1000	15	3	false	true	10	70	35	0.4
+
+# DLC: Digital Age - New Product Classes
+21	Software	DIGITAL	5000	50	0	false	false	10	90	50	0.5
+22	Cloud Services	DIGITAL	2000	80	0	false	false	9	85	45	0.45
+23	Mobile Apps	DIGITAL	1500	100	0	false	false	8	75	30	0.4
+24	AI Systems	DIGITAL	10000	20	0	false	false	10	100	60	0.6
+25	E-commerce Platform	DIGITAL	8000	30	0	false	false	9	80	40	0.35
+
+# DLC: Subsidiary - Financial Products
+26	Insurance Services	FINANCIAL	3000	40	0	false	false	7	70	35	0.2
+27	Investment Fund	FINANCIAL	5000	25	0	false	false	8	85	45	0.25
+28	Banking Services	FINANCIAL	4000	35	0	false	false	7	75	30	0.15
+
+# New Tech-Heavy Products
+29	Solar Panels	GREEN	800	40	50	false	true	7	50	20	0.3
+30	Electric Vehicles	GREEN	25000	8	1200	false	true	10	90	50	0.35
+31	Smartphones	CONSUMER	800	200	0.5	false	true	9	85	40	0.45
+32	Tablets	CONSUMER	600	150	0.8	false	true	8	70	25	0.4
+33	Gaming Consoles	CONSUMER	500	60	3	false	true	8	65	30	0.35
+34	Drones	CONSUMER	2000	30	5	false	true	9	75	35	0.4
+35	VR Headsets	CONSUMER	400	25	2	false	true	9	80	30	0.5
+1000	Process Innovation	INTERNAL	0	0	0	false	false	5	0	50	0.2

@@ -1,0 +1,76 @@
+# Building Definitions
+# Format: ID	Name	Type	BaseCost	ConstructionTime	MaxFloors	MaxSize	PowerConsumption	Pollution
+# Types: FARM, MINE, FACTORY, RETAIL, WAREHOUSE, OFFICE, RESIDENTIAL, SUPERMARKET, HOSPITAL, GYM, CINEMA, KINDERGARTEN, RESTAURANT, HOTEL, BANK
+
+ID	Name	Type	BaseCost	ConstructionTime	MaxFloors	MaxSize	PowerConsumption	Pollution
+1	Wheat Farm	FARM	5000	3	1	2	5	2
+2	Corn Farm	FARM	5000	3	1	2	5	2
+3	Cotton Farm	FARM	6000	4	1	2	5	2
+4	Iron Mine	MINE	15000	5	1	3	20	10
+5	Oil Rig	MINE	25000	6	1	3	30	15
+6	Timber Camp	MINE	8000	4	1	2	10	8
+7	Flour Mill	FACTORY	12000	4	2	3	15	5
+8	Textile Factory	FACTORY	20000	5	2	4	25	8
+9	Steel Mill	FACTORY	30000	6	3	5	40	20
+10	Plastic Plant	FACTORY	18000	5	2	4	30	12
+11	Sawmill	FACTORY	10000	4	2	3	15	6
+12	Bakery	FACTORY	15000	4	2	3	20	5
+13	Furniture Factory	FACTORY	25000	5	2	4	25	8
+14	Electronics Factory	FACTORY	40000	6	3	5	35	10
+15	Toy Factory	FACTORY	15000	4	2	3	20	5
+16	Book Printer	FACTORY	12000	4	2	3	15	4
+17	Jewelry Workshop	FACTORY	35000	5	2	3	15	3
+18	Car Factory	FACTORY	100000	8	4	6	80	25
+19	Computer Factory	FACTORY	60000	7	3	5	50	15
+20	Convenience Store	RETAIL	8000	2	1	2	10	1
+21	Clothing Store	RETAIL	12000	3	2	3	15	1
+22	Furniture Store	RETAIL	20000	3	2	3	15	1
+23	Electronics Store	RETAIL	30000	4	2	3	20	1
+24	Toy Store	RETAIL	10000	2	1	2	10	1
+25	Bookstore	RETAIL	8000	2	1	2	10	1
+26	Jewelry Store	RETAIL	40000	4	2	3	20	1
+27	Car Dealership	RETAIL	80000	5	3	4	30	2
+28	Computer Store	RETAIL	25000	3	2	3	20	1
+29	Small Warehouse	WAREHOUSE	5000	2	1	3	5	0
+30	Medium Warehouse	WAREHOUSE	15000	3	2	4	10	0
+31	Large Warehouse	WAREHOUSE	30000	4	3	5	15	0
+32	Corporate Office	OFFICE	50000	5	5	4	40	0
+33	R&D Center	OFFICE	80000	6	4	5	50	0
+34	Marketing Office	OFFICE	40000	4	3	4	35	0
+35	Studio Apartment	RESIDENTIAL	15000	3	4	2	10	0
+36	Apartment Complex	RESIDENTIAL	40000	5	8	4	25	1
+37	Luxury Condo Tower	RESIDENTIAL	120000	8	15	5	50	0
+38	Affordable Housing	RESIDENTIAL	25000	4	6	3	15	1
+39	Mini Market	SUPERMARKET	10000	2	1	2	15	1
+40	Supermarket	SUPERMARKET	35000	4	2	4	30	2
+41	Hypermarket	SUPERMARKET	80000	6	3	6	50	3
+42	Organic Market	SUPERMARKET	25000	3	1	3	20	0
+43	City Hospital	HOSPITAL	150000	8	6	5	80	2
+44	Medical Clinic	HOSPITAL	45000	4	3	3	30	1
+45	Dental Office	HOSPITAL	20000	2	2	2	15	0
+46	Pharmacy	HOSPITAL	12000	2	1	2	10	0
+47	Fitness Center	GYM	18000	3	2	3	25	0
+48	Luxury Gym	GYM	45000	4	3	4	40	0
+49	Yoga Studio	GYM	10000	2	1	2	10	0
+50	Sports Complex	GYM	80000	6	4	5	60	1
+51	Multiplex Cinema	CINEMA	60000	5	3	4	50	1
+52	Art House Cinema	CINEMA	25000	3	2	3	20	0
+53	IMAX Theater	CINEMA	100000	6	4	5	70	1
+54	Drive-In Cinema	CINEMA	15000	2	1	4	10	0
+55	Day Care Center	KINDERGARTEN	12000	2	2	2	10	0
+56	Preschool	KINDERGARTEN	18000	3	2	3	15	0
+57	Montessori School	KINDERGARTEN	30000	4	3	3	20	0
+58	After School Center	KINDERGARTEN	15000	2	2	2	12	0
+59	Fast Food Joint	RESTAURANT	8000	1	1	2	15	2
+60	Family Restaurant	RESTAURANT	20000	3	2	3	20	1
+61	Fine Dining	RESTAURANT	50000	4	2	3	25	0
+62	Cafe & Bakery	RESTAURANT	12000	2	1	2	12	0
+63	Food Court	RESTAURANT	35000	3	2	4	30	2
+64	Budget Hotel	HOTEL	30000	4	4	3	25	0
+65	Business Hotel	HOTEL	60000	5	8	4	40	0
+66	Luxury Resort	HOTEL	200000	8	12	6	80	0
+67	Boutique Hotel	HOTEL	45000	4	5	3	30	0
+68	Community Bank	BANK	35000	3	3	3	20	0
+69	Commercial Bank	BANK	80000	5	6	4	40	0
+70	Investment Bank	BANK	200000	7	10	5	60	0
+71	Credit Union	BANK	20000	2	2	2	15	0

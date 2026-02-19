@@ -1,0 +1,182 @@
+.world-map-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100vw;
+  height: 100vh;
+  background: rgba(0, 0, 0, 0.9);
+  z-index: 2000;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+}
+
+.world-map-container {
+  position: relative;
+  width: 90%;
+  height: 85%;
+  max-width: 1200px;
+  background: radial-gradient(circle at center, #1a202c 0%, #000 100%);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 4px;
+  box-shadow: 0 0 50px rgba(0, 0, 0, 0.8);
+  display: flex;
+  flex-direction: column;
+}
+
+.world-map-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 1rem 2rem;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+  background: rgba(255, 255, 255, 0.05);
+}
+
+.world-map-header h2 {
+  margin: 0;
+  font-size: 1.5rem;
+  letter-spacing: 2px;
+  color: #fff;
+}
+
+.world-map-visual {
+  flex: 1;
+  position: relative;
+  overflow: hidden;
+  background-image: url('data:image/svg+xml;utf8,<svg width="100" height="100" viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg"><g fill="%23FFFFFF" fill-opacity="0.03"><circle cx="2" cy="2" r="1"/></g></svg>'); /* Subtle grid */
+}
+
+/* 
+ * Ideally, we'd use a real SVG world map as background.
+ * For now, we simulate a map area. 
+ */
+.world-bg {
+  width: 100%;
+  height: 100%;
+  opacity: 0.3;
+  /* Dotted map texture or similar */
+  background: 
+    repeating-linear-gradient(0deg, transparent, transparent 19px, rgba(255,255,255,0.05) 20px),
+    repeating-linear-gradient(90deg, transparent, transparent 19px, rgba(255,255,255,0.05) 20px);
+}
+
+.city-marker {
+  position: absolute;
+  width: 12px;
+  height: 12px;
+  cursor: pointer;
+  transform: translate(-50%, -50%);
+}
+
+.marker-dot {
+  width: 100%;
+  height: 100%;
+  border-radius: 50%;
+  background: #00d2d3;
+  box-shadow: 0 0 10px #00d2d3;
+  transition: all 0.3s ease;
+}
+
+.city-marker:hover .marker-dot {
+  transform: scale(1.5);
+  background: #fff;
+}
+
+.city-marker.current .marker-dot {
+  background: #ff9f43;
+  box-shadow: 0 0 20px #ff9f43;
+}
+
+.marker-pulse {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  border: 1px solid #00d2d3;
+  transform: translate(-50%, -50%);
+  animation: pulse 2s infinite;
+  opacity: 0;
+}
+
+.city-tooltip {
+  position: absolute;
+  bottom: 20px;
+  left: 50%;
+  transform: translateX(-50%);
+  background: rgba(0, 0, 0, 0.8);
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  padding: 0.5rem 1rem;
+  border-radius: 4px;
+  white-space: nowrap;
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity 0.2s ease;
+  z-index: 10;
+}
+
+.city-marker:hover .city-tooltip {
+  opacity: 1;
+}
+
+.city-name {
+  display: block;
+  font-weight: bold;
+  color: #fff;
+  font-size: 0.9rem;
+}
+
+.city-stats {
+  display: block;
+  font-size: 0.75rem;
+  color: #a0aec0;
+}
+
+.world-stats-panel {
+  position: absolute;
+  top: 80px;
+  right: 20px;
+  width: 250px;
+  padding: 1.5rem;
+  background: rgba(16, 20, 24, 0.9);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 8px;
+}
+
+.world-stats-panel h3 {
+  margin: 0 0 1rem 0;
+  font-size: 0.8rem;
+  color: #718096;
+  letter-spacing: 1px;
+}
+
+.stat-row {
+  display: flex;
+  justify-content: space-between;
+  margin-bottom: 0.8rem;
+  font-size: 0.9rem;
+  color: #e2e8f0;
+}
+
+.stat-row .val {
+  font-family: 'Courier New', monospace;
+  font-weight: bold;
+  color: #48bb78;
+}
+
+@keyframes pulse {
+  0% { width: 10px; height: 10px; opacity: 1; }
+  100% { width: 40px; height: 40px; opacity: 0; }
+}
+
+.animate-fadeIn {
+  animation: fadeIn 0.4s ease-out forwards;
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
