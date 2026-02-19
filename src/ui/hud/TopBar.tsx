@@ -163,15 +163,15 @@ export function TopBar({
             ))}
           </div>
 
-          <button className="market-btn" onClick={onOpenMarket} title="Market Intelligence">
+          <button className="market-btn" onClick={() => onOpenMarket?.()} disabled={!onOpenMarket} title="Market Intelligence">
              <span>📊 MARKET</span>
            </button>
 
-          <button className="finance-btn" onClick={onOpenFinance} title="Financial Center">
+          <button className="finance-btn" onClick={() => onOpenFinance?.()} disabled={!onOpenFinance} title="Financial Center">
              <span>💰 FINANCE</span>
            </button>
 
-          <button className="stocks-btn" onClick={onOpenStocks} title="Stock Exchange">
+          <button className="stocks-btn" onClick={() => onOpenStocks?.()} disabled={!onOpenStocks} title="Stock Exchange">
              <span>📈 STOCKS</span>
            </button>
 

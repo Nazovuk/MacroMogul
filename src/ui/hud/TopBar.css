@@ -406,3 +406,9 @@
     color: white;
     border-color: rgba(59, 130, 246, 0.6);
 }
+
+/* Disabled state */
+.top-bar button:disabled{
+  opacity: 0.35;
+  cursor: not-allowed;
+}
