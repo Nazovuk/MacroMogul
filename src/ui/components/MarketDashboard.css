@@ -1,1 +1,69 @@
-/* Minimal placeholder to satisfy imports. Add styles later. */
+.market-dashboard-overlay{
+  position: fixed;
+  inset: 0;
+  z-index: 3000;
+  background: rgba(0,0,0,0.55);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 24px;
+}
+
+.market-dashboard{
+  width: min(1100px, calc(100vw - 48px));
+  max-height: calc(100vh - 96px);
+  overflow: auto;
+  background: rgba(15, 20, 35, 0.96);
+  border: 1px solid rgba(255,255,255,0.12);
+  border-radius: 16px;
+  box-shadow: 0 18px 60px rgba(0,0,0,0.55);
+  padding: 16px;
+}
+
+.market-dashboard .dashboard-header{
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  gap:12px;
+  padding: 8px 8px 12px 8px;
+  border-bottom: 1px solid rgba(255,255,255,0.08);
+}
+
+.market-dashboard .dashboard-tabs{
+  display:flex;
+  gap:8px;
+  padding: 12px 8px;
+  position: sticky;
+  top: 0;
+  background: rgba(15,20,35,0.98);
+  z-index: 1;
+}
+
+.market-dashboard .dashboard-tabs button{
+  border: 1px solid rgba(255,255,255,0.14);
+  background: rgba(255,255,255,0.06);
+  color: rgba(255,255,255,0.85);
+  padding: 8px 10px;
+  border-radius: 10px;
+  cursor: pointer;
+}
+
+.market-dashboard .dashboard-tabs button.active{
+  background: rgba(0,217,165,0.12);
+  border-color: rgba(0,217,165,0.35);
+  color: #fff;
+}
+
+.market-dashboard .dashboard-content{
+  padding: 8px;
+}
+
+.market-dashboard .close-btn{
+  border: 1px solid rgba(255,255,255,0.14);
+  background: rgba(255,255,255,0.06);
+  color: rgba(255,255,255,0.9);
+  width: 36px;
+  height: 36px;
+  border-radius: 10px;
+  cursor: pointer;
+}
