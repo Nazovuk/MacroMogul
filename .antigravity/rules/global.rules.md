@@ -9,8 +9,6 @@
 - Never edit node_modules or build artifacts.
 - All changes must be in tracked source/docs only.
 - Before committing, run:
-  - git grep -nE "capitalism-lab-clone|capitalism-clone" || true
-  - git grep -nE "\"Close\"|'Close'|>Close<|>close<|\"close\"|'close'" || true
 
 ## Output discipline
 - Prefer minimal, safe changes.
