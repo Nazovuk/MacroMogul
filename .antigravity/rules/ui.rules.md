@@ -1,3 +1,4 @@
+> This file complements global.rules.md
 GLOBAL UI RULES:
 - Never downgrade TopBar visuals
 - Preserve glassmorphism style
