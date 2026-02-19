@@ -124,7 +124,7 @@
     "build": "İNŞA ET",
     "buy": "Satın Al",
     "sell": "Sat",
-    "close": "Kapat",
+    "×": "Kapat",
     "pause": "Duraklat",
     "speed": "Hız"
   },

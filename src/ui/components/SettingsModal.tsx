@@ -38,7 +38,7 @@ export function SettingsModal({ isOpen, onClose, language = "en", onChangeLangua
         </div>
 
         <div className="mm-row" style={{ justifyContent: "flex-end" }}>
-          <button onClick={onClose}>Close</button>
+          <button onClick={onClose}>×</button>
         </div>
       </div>
     </div>

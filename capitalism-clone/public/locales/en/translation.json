@@ -160,7 +160,7 @@
     "build": "BUILD",
     "buy": "Buy",
     "sell": "Sell",
-    "close": "Close",
+    "×": "×",
     "pause": "Pause",
     "speed": "Speed"
   },
@@ -523,6 +523,6 @@
   },
   "common": {
     "cancel": "Cancel",
-    "close": "Close"
+    "×": "×"
   }
 }
