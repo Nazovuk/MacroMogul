@@ -18,7 +18,7 @@
 ## Project Folder Structure
 
 ```
-capitalism-clone/
+MacroMogul/
 ├── public/
 │   ├── assets/               # Sprites, tiles, sounds
 │   └── locales/              # i18n JSON files (en.json, tr.json)
