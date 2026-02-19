@@ -13,9 +13,8 @@ interface TopBarProps {
   currentSpeed: number;
   isPaused: boolean;
   currentCity?: string;
-  onOpenMarket?: () => void;
-  onOpenFinance?: () => void;
-  onOpenStocks?: () => void;
+  activePanel: 'none' | 'market' | 'finance' | 'stocks' | 'system' | 'settings';
+  onTogglePanel: (panel: 'market' | 'finance' | 'stocks' | 'system' | 'settings') => void;
 }
 
 export function TopBar({
@@ -28,9 +27,8 @@ export function TopBar({
   currentSpeed,
   isPaused,
   currentCity = "New York",
-  onOpenMarket,
-  onOpenFinance,
-  onOpenStocks,
+  activePanel,
+  onTogglePanel
 }: TopBarProps) {
   const { t } = useTranslation();
   const [displayCash, setDisplayCash] = useState(cash);
@@ -111,7 +109,7 @@ export function TopBar({
             <div className="date-main">
               <span className="month">{monthNames[gameDate.month - 1]}</span>
               <span className="day">{gameDate.day}</span>
-              <span className="year">,{gameDate.year}</span>
+              <span className="year">, {gameDate.year}</span>
             </div>
             <div className="date-subtitle">
               {currentCity.toUpperCase()} • <span style={{ color: cycleColor, fontWeight: 'bold' }}>{cycleLabel}</span>
@@ -119,18 +117,41 @@ export function TopBar({
           </div>
         </div>
 
-        {/* Notification Bell */}
-        <div className="top-section notification-section">
-          <button className="notification-btn" title={t('menu.notifications') || 'Notifications'}>
-            <svg viewBox="0 0 24 24" fill="currentColor" width="18" height="18">
-              <path d="M12 22c1.1 0 2-.9 2-2h-4c0 1.1.9 2 2 2zm6-6v-5c0-3.07-1.63-5.64-4.5-6.32V4c0-.83-.67-1.5-1.5-1.5s-1.5.67-1.5 1.5v.68C7.64 5.36 6 7.92 6 11v5l-2 2v1h16v-1l-2-2z" />
-            </svg>
-            <span className="notification-badge">3</span>
-          </button>
-        </div>
-
-        {/* Right Section - Speed Controls */}
+        {/* Right Section - Controls & Panels */}
         <div className="top-section controls-section">
+           {/* Panel Toggles */}
+           <div className="panel-toggles">
+              <button 
+                  className={`nav-btn market ${activePanel === 'market' ? 'active' : ''}`} 
+                  onClick={() => onTogglePanel('market')}
+                  title="Market Intelligence"
+              >
+                 <span className="icon">📊</span>
+                 <span className="label">MARKET</span>
+              </button>
+              
+              <button 
+                  className={`nav-btn finance ${activePanel === 'finance' ? 'active' : ''}`} 
+                  onClick={() => onTogglePanel('finance')}
+                  title="Financial Center"
+              >
+                 <span className="icon">💰</span>
+                 <span className="label">FINANCE</span>
+              </button>
+              
+              <button 
+                  className={`nav-btn stocks ${activePanel === 'stocks' ? 'active' : ''}`} 
+                  onClick={() => onTogglePanel('stocks')}
+                  title="Stock Exchange"
+              >
+                 <span className="icon">📈</span>
+                 <span className="label">STOCKS</span>
+              </button>
+           </div>
+           
+           <div className="divider"></div>
+
+          {/* Speed Controls */}
           <div className="speed-controls">
             <button 
               className={`speed-btn ${isPaused ? 'resume' : ''}`}
@@ -163,22 +184,12 @@ export function TopBar({
             ))}
           </div>
 
-          <button className="market-btn" onClick={onOpenMarket} title="Market Intelligence">
-             <span>📊 MARKET</span>
-           </button>
-
-          <button className="finance-btn" onClick={onOpenFinance} title="Financial Center">
-             <span>💰 FINANCE</span>
-           </button>
-
-          <button className="stocks-btn" onClick={onOpenStocks} title="Stock Exchange">
-             <span>📈 STOCKS</span>
-           </button>
-
-
-          <button className="system-btn" onClick={() => window.dispatchEvent(new CustomEvent('toggleSystemMenu'))}>
+          <button 
+              className={`system-btn ${activePanel === 'system' ? 'active' : ''}`} 
+              onClick={() => onTogglePanel('system')}
+          >
              <span>SYSTEM</span>
-           </button>
+          </button>
          </div>
       </div>
       

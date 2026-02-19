@@ -45,14 +45,13 @@ function App() {
   const [showBuildMenu, setShowBuildMenu] = useState(false);
   const [showOverlayMenu, setShowOverlayMenu] = useState(false);
   const [showWorldMap, setShowWorldMap] = useState(false);
+  const [activePanel, setActivePanel] = useState<'none' | 'market' | 'finance' | 'stocks' | 'system' | 'settings'>('none');
   const [activeOverlay, setActiveOverlay] = useState<string | null>(null);
   const [currentCityId, setCurrentCityId] = useState<string>('city_01'); // Default start
   const [isTraveling, setIsTraveling] = useState(false);
-  const [showSystemMenu, setShowSystemMenu] = useState(false);
-  const [showMarketDashboard, setShowMarketDashboard] = useState(false);
-  const [showFinancialDashboard, setShowFinancialDashboard] = useState(false);
-  const [showStockTrading, setShowStockTrading] = useState(false);
-  const [showSettingsModal, setShowSettingsModal] = useState(false);
+  // Removed separate states: showSystemMenu, showMarketDashboard, showFinancialDashboard, showStockTrading, showSettingsModal
+  // These are now handled by activePanel
+  
   const [selectedBuildingToBuild, setSelectedBuildingToBuild] = useState<BuildingData | null>(null);
   const [selectedEntityId, setSelectedEntityId] = useState<number | null>(null);
 
@@ -115,19 +114,23 @@ function App() {
     setShowDashboard(false);
     setShowBuildMenu(!showBuildMenu);
     setSelectedEntityId(null); // Close firm detail panel
+    setActivePanel('none');
   };
 
   const handleManagement = () => {
     setShowBuildMenu(false);
     setShowDashboard(!showDashboard);
     setSelectedEntityId(null); // Close firm detail panel
+    setActivePanel('none');
   };
 
   const handleMapOverlay = () => {
     setShowDashboard(false);
     setShowBuildMenu(false);
     setShowOverlayMenu(!showOverlayMenu);
+    
     setSelectedEntityId(null); // Close firm detail panel
+    setActivePanel('none');
   };
 
   const handleWorldMap = () => {
@@ -136,6 +139,7 @@ function App() {
     setShowOverlayMenu(false);
     setShowWorldMap(true);
     setSelectedEntityId(null); // Close firm detail panel
+    setActivePanel('none');
   };
   
   const handleUpgradeBuilding = (entityId: number) => {
@@ -166,14 +170,14 @@ function App() {
   const handleSaveGame = (slotName: string) => {
       if (world) {
           PersistenceService.saveGame(world, slotName);
-          setShowSystemMenu(false);
+          setActivePanel('none');
           setIsPaused(false);
       }
   };
 
   const handleLoadGame = async (slotName: string) => {
       setGameState('loading');
-      setShowSystemMenu(false);
+      setActivePanel('none');
       try {
           const loadedWorld = await PersistenceService.loadGame(slotName);
           if (loadedWorld) {
@@ -188,20 +192,18 @@ function App() {
       }
   };
 
-  // System Menu Event Listener
-  useEffect(() => {
-      const handler = () => {
-          setShowSystemMenu(true);
-          setIsPaused(true);
+  const togglePanel = (panel: 'market' | 'finance' | 'stocks' | 'system' | 'settings') => {
+      if (activePanel === panel) {
+          setActivePanel('none');
+          if (panel === 'system') setIsPaused(false);
+      } else {
+          setActivePanel(panel);
           setShowDashboard(false);
           setShowBuildMenu(false);
-          setShowOverlayMenu(false);
-          setShowWorldMap(false);
           setSelectedEntityId(null);
-      };
-      window.addEventListener('toggleSystemMenu', handler);
-      return () => window.removeEventListener('toggleSystemMenu', handler);
-  }, []);
+          if (panel === 'system') setIsPaused(true);
+      }
+  };
   useEffect(() => {
     if (gameState !== 'playing' || isPaused || !world) return;
 
@@ -225,47 +227,6 @@ function App() {
 
   if (gameState === 'menu') {
     return (
-      <MainMenu
-        onNewGame={startNewGame}
-        onLoadGame={(slotName: string) => handleLoadGame(slotName)}
-        onSettings={() => setShowSettingsModal(true)}
-        onExit={() => window.close()}
-      />
-    );
-  }
-
-  if (gameState === 'scenario') {
-    return (
-      <ScenarioSelect 
-        onStartScenario={startScenario}
-        onBack={() => setGameState('menu')}
-      />
-    );
-  }
-
-  if (gameState === 'loading' || isTraveling) {
-    return (
-      <div className="loading-screen">
-        <div className="loading-spinner"></div>
-        <h2>{isTraveling ? `Traveling to ${currentCityId.replace('city_', 'Region ')}...` : 'Loading Game World...'}</h2>
-        <p>{isTraveling ? 'Establishing local headquarters...' : 'Initializing ECS architecture'}</p>
-      </div>
-    );
-  }
-
-  if (error) {
-    return (
-      <div className="error-screen">
-        <h1>Error</h1>
-        <p>{error}</p>
-        <button onClick={() => setGameState('menu')}>Back to Menu</button>
-      </div>
-    );
-  }
-
-  return (
-    <div className="app">
-      <NotificationToast />
       <TopBar
         gameDate={{
           day: world?.day || 1,
@@ -279,18 +240,8 @@ function App() {
         currentSpeed={gameSpeed}
         isPaused={isPaused}
         currentCity={CITIES.find(c => c.id === currentCityId)?.name || 'New York'}
-        onOpenMarket={() => {
-          setShowMarketDashboard(true);
-          setSelectedEntityId(null);
-        }}
-        onOpenFinance={() => {
-          setShowFinancialDashboard(true);
-          setSelectedEntityId(null);
-        }}
-        onOpenStocks={() => {
-          setShowStockTrading(true);
-          setSelectedEntityId(null);
-        }}
+        activePanel={activePanel}
+        onTogglePanel={togglePanel}
       />
 
       {gameState === 'playing' && world && <StockTicker world={world} />}
@@ -309,6 +260,7 @@ function App() {
                 if (id !== null) {
                   setShowDashboard(false);
                   setShowBuildMenu(false);
+                  setActivePanel('none');
                 }
                 setSelectedEntityId(id);
               }}
@@ -346,7 +298,6 @@ function App() {
         {showBuildMenu && world && (
           <BuildMenu
             buildings={Array.from(world.dataStore.buildings.values())}
-            playerCash={world.cash}
             onSelectBuilding={(building) => {
               setSelectedBuildingToBuild(building);
               setShowBuildMenu(false);
@@ -411,48 +362,48 @@ function App() {
         onWorldMap={handleWorldMap}
       />
 
-      {showSystemMenu && (
+      {activePanel === 'system' && (
           <SystemMenu
              onCheckSaveSlots={() => PersistenceService.getAvailableSaves()}
              onSave={handleSaveGame}
              onLoad={handleLoadGame}
              onResume={() => {
-                 setShowSystemMenu(false);
+                 setActivePanel('none');
                  setIsPaused(false);
              }}
              onExit={() => {
                  setGameState('menu');
-                 setShowSystemMenu(false);
+                 setActivePanel('none');
                  setWorld(null);
              }}
           />
       )}
 
-      {showMarketDashboard && world && (
+      {activePanel === 'market' && world && (
           <MarketDashboard
              world={world}
-             onClose={() => setShowMarketDashboard(false)}
+             onClose={() => setActivePanel('none')}
           />
       )}
 
-      {showFinancialDashboard && world && (
+      {activePanel === 'finance' && world && (
           <FinancialDashboard
              world={world}
-             onClose={() => setShowFinancialDashboard(false)}
+             onClose={() => setActivePanel('none')}
           />
       )}
 
-      {showStockTrading && world && (
+      {activePanel === 'stocks' && world && (
           <StockTrading
              world={world}
-             onClose={() => setShowStockTrading(false)}
+             onClose={() => setActivePanel('none')}
           />
       )}
 
-      {showSettingsModal && (
+      {activePanel === 'settings' && (
           <SettingsModal
-             isOpen={showSettingsModal}
-             onClose={() => setShowSettingsModal(false)}
+             isOpen={activePanel === 'settings'}
+             onClose={() => setActivePanel('none')}
              currentSpeed={gameSpeed}
              onSpeedChange={handleSpeedChange}
           />
