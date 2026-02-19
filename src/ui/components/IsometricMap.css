@@ -1,1 +1,11 @@
-/* Minimal placeholder to satisfy imports. Add styles later. */
+/* Keep it lightweight: renderer is canvas-based; CSS is mainly container safety */
+.isometric-map-wrap{
+  position: relative;
+  width: 100%;
+  height: 100%;
+}
+.isometric-map-wrap canvas{
+  display:block;
+  width: 100%;
+  height: 100%;
+}
