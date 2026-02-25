@@ -41,6 +41,7 @@ import {
   PollutionEmitter,
   RDCenter,
   Warehouse,
+  Strike,
   Loan,
   CorporateBond,
 } from '../ecs/components'
@@ -109,6 +110,7 @@ export const PersistenceService = {
     'PollutionEmitter': PollutionEmitter,
     'RDCenter': RDCenter,
     'Warehouse': Warehouse,
+    'Strike': Strike,
   } as Record<string, any>,
 
   /**

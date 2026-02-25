@@ -13,9 +13,9 @@
 **Açıklama:** Kredi çekme, geri ödeme ve kredi notu sistemleri UI ile entegre edildi.
 
 ### 3. Save/Load Integrity
-**Durum:** DEVAM EDİYOR ⏳
+**Durum:** TAMAMLANDI ✅
 **Dosyalar:** `src/core/services/PersistenceService.ts`  
-**Açıklama:** Finans verilerinin (loan/bond) save sistemine dahil edildiği doğrulandı.
+**Açıklama:** Finans verilerinin (loan/bond) save sistemine dahil edildi, eklentiler ECS component eksikleri giderildi.
 
 ### 4. IsometricMap Rendering
 **Durum:** TAMAMLANDI ✅
@@ -23,9 +23,9 @@
 **Açıklama:** bitECS world state izometrik rendering'e bağlandı. Şehirler ve binalar senkronize edildi.
 
 ### 5. Internal Management Logic
-**Durum:** DEVAM EDİYOR ⏳
-**Dosyalar:** `src/core/ecs/systems/ManagementSystem.ts`  
-**Açıklama:** Moral, eğitim, verimlilik ve yan haklar (benefits) mantığı implemente edildi. Turnover maliyetleri ve grev mekanizması eklendi.
+**Durum:** TAMAMLANDI ✅
+**Dosyalar:** `src/core/ecs/systems/ManagementSystem.ts`, `src/ui/components/HQDashboard.tsx`  
+**Açıklama:** Moral, eğitim, verimlilik ve yan haklar (benefits) mantığı implemente edildi. UI entegrasyonu (Yönetim Paneli) tamamlandı.
 
 ## UI Görevleri (Orta Öncelik)
 - [x] Dashboard finansal verileri ECS'ye bağlama
