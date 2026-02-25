@@ -59,6 +59,7 @@ interface SaveFile {
   }
   entities: ArchivedEntity[]
   financials?: Record<number, { loans: Loan[], bonds: CorporateBond[] }> // Extended financial data
+  portfolio?: { entityId: number; shares: number; avgCostBasis: number }[]
 }
 
 interface ArchivedEntity {
@@ -179,7 +180,8 @@ export const PersistenceService = {
           seed: world.seed
         },
         entities: archived,
-        financials: Object.keys(financialsData).length > 0 ? financialsData : undefined
+        financials: Object.keys(financialsData).length > 0 ? financialsData : undefined,
+        portfolio: world.portfolio.length > 0 ? world.portfolio : undefined
       }
 
       const json = JSON.stringify(saveFile)
@@ -302,6 +304,22 @@ export const PersistenceService = {
           }
         }
         console.log(`Restored financial data for ${Object.keys(saveFile.financials).length} companies`)
+      }
+
+      // 6. Restore Player Portfolio
+      if (saveFile.portfolio) {
+        world.portfolio = []
+        for (const holding of saveFile.portfolio) {
+          const newCompanyId = restorationMap.get(holding.entityId)
+          if (newCompanyId) {
+            world.portfolio.push({
+              entityId: newCompanyId,
+              shares: holding.shares,
+              avgCostBasis: holding.avgCostBasis
+            })
+          }
+        }
+        console.log(`Restored portfolio with ${world.portfolio.length} holdings.`)
       }
 
       console.log("Game loaded successfully.")
