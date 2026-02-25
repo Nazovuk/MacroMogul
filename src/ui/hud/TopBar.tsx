@@ -390,7 +390,7 @@ export function TopBar({
               <div className="btn-glow"></div>
             </div>
             <div className="tab-content">
-              <span className="tab-title">{t('menu.economy')}</span>
+              <span className="tab-title">{t('menu.economy')} / {t('stock.exchange_title', { defaultValue: 'BORSA' })}</span>
               {companyStats && (
                 <div className="tab-metrics">
                   <span className="metric">
