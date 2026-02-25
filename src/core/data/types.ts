@@ -26,6 +26,10 @@ export interface ProductData {
   unitWeight: number
   perishable: boolean
   qualitySensitive: boolean
+  techLevel: number
+  expertiseRequired: number
+  knowledgePoints: number
+  innovationRate: number
 }
 
 // ============================================================================

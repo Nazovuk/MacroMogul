@@ -1,190 +1,351 @@
-
 .system-menu-overlay {
-    position: fixed;
-    top: 0;
-    left: 0;
-    right: 0;
-    bottom: 0;
-    background: rgba(0, 0, 0, 0.7);
-    backdrop-filter: blur(8px);
-    display: flex;
-    justify-content: center;
-    align-items: center;
-    z-index: 2000;
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.7);
+  backdrop-filter: blur(8px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 9999;
+  animation: fadeIn 0.3s ease;
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
 }
 
 .system-menu-container {
-    background: rgba(15, 23, 42, 0.95);
-    border: 1px solid rgba(255, 255, 255, 0.1);
-    border-radius: 12px;
-    padding: 30px;
-    width: 500px;
-    max-width: 90vw;
-    box-shadow: 0 20px 50px rgba(0, 0, 0, 0.5);
-    color: white;
+  background: linear-gradient(165deg, rgba(20, 25, 40, 0.98), rgba(30, 35, 50, 0.95));
+  backdrop-filter: blur(20px);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 24px;
+  padding: 40px;
+  min-width: 480px;
+  max-width: 600px;
+  box-shadow: 
+    0 25px 50px rgba(0, 0, 0, 0.5),
+    0 0 0 1px rgba(255, 255, 255, 0.05);
+  animation: slideUp 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+@keyframes slideUp {
+  from {
+    opacity: 0;
+    transform: translateY(30px) scale(0.95);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+.menu-header {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  margin-bottom: 32px;
+  padding-bottom: 24px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.header-icon {
+  width: 48px;
+  height: 48px;
+  background: linear-gradient(135deg, #e94560, #70a1ff);
+  border-radius: 12px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: white;
+  box-shadow: 0 8px 24px rgba(233, 69, 96, 0.3);
 }
 
 .menu-title {
-    text-align: center;
-    margin-bottom: 30px;
-    font-size: 1.5rem;
-    letter-spacing: 2px;
-    color: #f1f5f9;
-    border-bottom: 1px solid rgba(255, 255, 255, 0.1);
-    padding-bottom: 15px;
+  font-family: "Outfit", sans-serif;
+  font-size: 1.5rem;
+  font-weight: 700;
+  color: white;
+  letter-spacing: 0.02em;
+  margin: 0;
 }
 
-.menu-options {
-    display: flex;
-    flex-direction: column;
-    gap: 15px;
+.menu-grid {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
 }
 
-.menu-options button {
-    background: rgba(255, 255, 255, 0.05);
-    border: 1px solid rgba(255, 255, 255, 0.1);
-    color: #e2e8f0;
-    padding: 15px;
-    border-radius: 8px;
-    font-size: 1rem;
-    font-weight: 600;
-    cursor: pointer;
-    transition: all 0.2s;
-    text-align: center;
-    letter-spacing: 1px;
+.menu-card {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  padding: 20px 24px;
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 16px;
+  cursor: pointer;
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  text-align: left;
+  color: white;
 }
 
-.menu-options button:hover {
-    background: rgba(59, 130, 246, 0.1);
-    border-color: #3b82f6;
-    color: white;
+.menu-card:hover {
+  background: rgba(255, 255, 255, 0.08);
+  border-color: rgba(255, 255, 255, 0.15);
+  transform: translateX(8px);
 }
 
-.menu-options .divider {
-    height: 1px;
-    background: rgba(255, 255, 255, 0.1);
-    margin: 10px 0;
+.save-card:hover {
+  border-color: rgba(0, 217, 165, 0.4);
+  box-shadow: 0 8px 24px rgba(0, 217, 165, 0.15);
 }
 
-.menu-options .resume-btn {
-    background: #3b82f6;
-    color: white;
-    border: none;
+.load-card:hover {
+  border-color: rgba(112, 161, 255, 0.4);
+  box-shadow: 0 8px 24px rgba(112, 161, 255, 0.15);
 }
 
-.menu-options .resume-btn:hover {
-    background: #2563eb;
+.github-card:hover {
+  border-color: rgba(233, 69, 96, 0.4);
+  box-shadow: 0 8px 24px rgba(233, 69, 96, 0.15);
 }
 
-.menu-options .danger-btn:hover {
-    background: rgba(239, 68, 68, 0.2);
-    border-color: #ef4444;
-    color: #ef4444;
+.card-icon {
+  font-size: 1.5rem;
+  width: 48px;
+  height: 48px;
+  background: rgba(255, 255, 255, 0.05);
+  border-radius: 12px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.card-content {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.card-label {
+  font-family: "Outfit", sans-serif;
+  font-size: 1rem;
+  font-weight: 600;
+  color: white;
+}
+
+.card-desc {
+  font-size: 0.8rem;
+  color: rgba(255, 255, 255, 0.5);
+}
+
+.card-arrow {
+  font-size: 1.2rem;
+  color: rgba(255, 255, 255, 0.3);
+  transition: all 0.3s ease;
+}
+
+.menu-card:hover .card-arrow {
+  color: white;
+  transform: translateX(4px);
+}
+
+.menu-divider {
+  height: 1px;
+  background: rgba(255, 255, 255, 0.1);
+  margin: 8px 0;
+}
+
+.resume-card {
+  background: linear-gradient(135deg, rgba(0, 217, 165, 0.15), rgba(0, 217, 165, 0.05));
+  border-color: rgba(0, 217, 165, 0.3);
+}
+
+.resume-card:hover {
+  background: linear-gradient(135deg, rgba(0, 217, 165, 0.2), rgba(0, 217, 165, 0.1));
+  border-color: rgba(0, 217, 165, 0.5);
+}
+
+.exit-card {
+  background: rgba(239, 68, 68, 0.05);
+  border-color: rgba(239, 68, 68, 0.2);
+}
+
+.exit-card:hover {
+  background: rgba(239, 68, 68, 0.1);
+  border-color: rgba(239, 68, 68, 0.4);
 }
 
 /* Save/Load Panel */
+.save-load-panel {
+  animation: fadeIn 0.3s ease;
+}
+
 .panel-header {
-    display: flex;
-    align-items: center;
-    margin-bottom: 20px;
-    position: relative;
-    justify-content: center;
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  margin-bottom: 24px;
 }
 
 .back-btn {
-    position: absolute;
-    left: 0;
-    background: none;
-    border: none;
-    color: #94a3b8;
-    cursor: pointer;
-    font-size: 0.9rem;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 16px;
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 10px;
+  color: rgba(255, 255, 255, 0.7);
+  cursor: pointer;
+  transition: all 0.2s ease;
+  font-size: 0.85rem;
 }
 
-.slots-list {
-    max-height: 400px;
-    overflow-y: auto;
-    display: flex;
-    flex-direction: column;
-    gap: 10px;
+.back-btn:hover {
+  background: rgba(255, 255, 255, 0.1);
+  border-color: rgba(255, 255, 255, 0.2);
+  color: white;
 }
 
-.new-save-row {
-    display: flex;
-    gap: 10px;
-    margin-bottom: 20px;
+.panel-header h3 {
+  font-family: "Outfit", sans-serif;
+  font-size: 1.1rem;
+  font-weight: 600;
+  color: white;
+  margin: 0;
 }
 
-.new-save-row input {
-    flex: 1;
-    background: rgba(0, 0, 0, 0.3);
-    border: 1px solid rgba(255, 255, 255, 0.1);
-    padding: 10px;
-    border-radius: 6px;
-    color: white;
-    font-family: inherit;
+.new-save-section {
+  display: flex;
+  gap: 12px;
+  margin-bottom: 24px;
 }
 
-.new-save-row button {
-    background: #3b82f6;
-    color: white;
-    border: none;
-    padding: 0 20px;
-    border-radius: 6px;
-    font-weight: 700;
-    cursor: pointer;
+.save-input {
+  flex: 1;
+  padding: 14px 18px;
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 12px;
+  color: white;
+  font-size: 0.95rem;
+  outline: none;
+  transition: all 0.2s ease;
 }
 
-.new-save-row button:disabled {
-    opacity: 0.5;
-    cursor: not-allowed;
+.save-input:focus {
+  border-color: rgba(0, 217, 165, 0.5);
+  background: rgba(255, 255, 255, 0.08);
 }
 
-.slot-item {
-    background: rgba(255, 255, 255, 0.03);
-    padding: 15px;
-    border-radius: 8px;
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    border: 1px solid rgba(255, 255, 255, 0.05);
+.save-input::placeholder {
+  color: rgba(255, 255, 255, 0.3);
+}
+
+.action-btn {
+  padding: 14px 24px;
+  border-radius: 12px;
+  font-family: "Outfit", sans-serif;
+  font-weight: 600;
+  font-size: 0.9rem;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  border: none;
+}
+
+.action-btn.primary {
+  background: linear-gradient(135deg, #00d9a5, #00b386);
+  color: white;
+  box-shadow: 0 4px 16px rgba(0, 217, 165, 0.3);
+}
+
+.action-btn.primary:hover:not(:disabled) {
+  transform: translateY(-2px);
+  box-shadow: 0 6px 20px rgba(0, 217, 165, 0.4);
+}
+
+.action-btn.secondary {
+  background: rgba(255, 255, 255, 0.1);
+  color: white;
+  border: 1px solid rgba(255, 255, 255, 0.2);
+}
+
+.action-btn.secondary:hover {
+  background: rgba(255, 255, 255, 0.15);
+}
+
+.action-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.saves-list {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  max-height: 400px;
+  overflow-y: auto;
+}
+
+.empty-state {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 12px;
+  padding: 48px 24px;
+  color: rgba(255, 255, 255, 0.4);
+  font-size: 0.9rem;
+}
+
+.empty-icon {
+  font-size: 3rem;
+  opacity: 0.5;
+}
+
+.save-slot {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 16px 20px;
+  background: rgba(255, 255, 255, 0.03);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 14px;
+  transition: all 0.2s ease;
+}
+
+.save-slot:hover {
+  background: rgba(255, 255, 255, 0.06);
+  border-color: rgba(255, 255, 255, 0.15);
 }
 
 .slot-info {
-    display: flex;
-    flex-direction: column;
-    gap: 5px;
+  display: flex;
+  align-items: center;
+  gap: 14px;
+}
+
+.slot-icon {
+  font-size: 1.5rem;
+}
+
+.slot-details {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
 }
 
 .slot-name {
-    font-weight: 700;
-    color: #f1f5f9;
+  font-family: "Outfit", sans-serif;
+  font-weight: 600;
+  color: white;
+  font-size: 0.95rem;
 }
 
-.slot-date {
-    font-size: 0.8rem;
-    color: #64748b;
-}
-
-.slot-actions button {
-    background: rgba(255, 255, 255, 0.05);
-    border: 1px solid rgba(255, 255, 255, 0.1);
-    color: #e2e8f0;
-    padding: 8px 16px;
-    border-radius: 6px;
-    font-size: 0.8rem;
-    font-weight: 600;
-    cursor: pointer;
-}
-
-.slot-actions button:hover {
-    background: rgba(59, 130, 246, 0.1);
-    border-color: #3b82f6;
-}
-
-.no-saves {
-    text-align: center;
-    color: #64748b;
-    padding: 20px;
-    font-style: italic;
+.slot-meta {
+  font-size: 0.75rem;
+  color: rgba(255, 255, 255, 0.4);
 }

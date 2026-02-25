@@ -1,5 +1,5 @@
 import { defineQuery } from 'bitecs'
-import { Building, RetailPlot, Inventory, RetailExpertise, Company, ProductBrand, Finances, Position, CityEconomicData } from '../components'
+import { Building, RetailPlot, Inventory, RetailExpertise, Company, ProductBrand, Finances, Position, CityEconomicData, MarketData } from '../components'
 import { GameWorld } from '../world'
 import { BuildingType } from '../../data/types'
 
@@ -24,6 +24,17 @@ export const retailSystem = (world: GameWorld) => {
   
   const retailQuery = defineQuery([Building, RetailPlot, Inventory, RetailExpertise, Company, Position])
   const entities = retailQuery(world.ecsWorld)
+ 
+  // Cache market data
+  const marketQuery = defineQuery([MarketData])
+  const marketEntities = marketQuery(world.ecsWorld)
+  const marketMap = new Map<number, { avgPrice: number, avgQuality: number }>()
+  for (const meid of marketEntities) {
+    marketMap.set(MarketData.productId[meid], {
+      avgPrice: MarketData.price[meid],
+      avgQuality: MarketData.quality[meid]
+    })
+  }
 
   // Cache city data entities
   const cityQuery = defineQuery([CityEconomicData, Position])
@@ -31,6 +42,26 @@ export const retailSystem = (world: GameWorld) => {
   const cityMap = new Map<number, number>()
   for (const ceid of cityEntities) {
     cityMap.set(Position.cityId[ceid], ceid)
+  }
+
+  // ─── NEW: City-Level Market Concentration ───
+  // Map<CityID, Map<ProductID, Count>>
+  const storeConcentration = new Map<number, Map<number, number>>()
+  if (isProcessDay) {
+    for (const id of entities) {
+      if (Building.isOperational[id] === 0) continue
+      const cityId = Position.cityId[id]
+      const prods = [Inventory.input1ProductId[id], Inventory.input2ProductId[id], Inventory.input3ProductId[id]]
+      
+      if (!storeConcentration.has(cityId)) storeConcentration.set(cityId, new Map())
+      const cityProds = storeConcentration.get(cityId)!
+      
+      for (const p of prods) {
+        if (p > 0) {
+          cityProds.set(p, (cityProds.get(p) || 0) + 1)
+        }
+      }
+    }
   }
 
   // Cache brand lookups per company to avoid repeated queries
@@ -101,8 +132,30 @@ export const retailSystem = (world: GameWorld) => {
       const econMult = (purchasingPower / 70) * (sentiment / 70)
       // High unemployment = cautious consumers (0.9x at 15%, 1.0x at 6%)
       const unemploymentDrag = Math.max(0.7, 1 - (unemployment - 6) / 90)
-      // Macro demand wave from MacroEconomySystem
-      const macroDemandMult = industryDemand * unemploymentDrag
+      
+      // Holiday Seasonality (Q4 Boom: Nov/Dec)
+      const isHolidaySeason = world.month === 11 || world.month === 12;
+      const holidayBoom = isHolidaySeason ? 1.35 : 1.0;
+
+      // Macro demand wave from MacroEconomySystem + Seasonality
+      const macroDemandMult = industryDemand * unemploymentDrag * holidayBoom;
+
+      // 1.5. RETAIL SHRINKAGE (Theft / Loss)
+      // High unemployment increases daily theft rate
+      if (isProcessDay && unemployment > 5) {
+          const theftRate = (unemployment / 100) * 0.005; // 0.05% loss per day at 10% unemployment
+          const stolenAmount = Math.floor(slot.amt * theftRate);
+          if (stolenAmount > 0) {
+              if (slot.idx === 1) Inventory.input1Amount[id] = Math.max(0, Inventory.input1Amount[id] - stolenAmount);
+              else if (slot.idx === 2) Inventory.input2Amount[id] = Math.max(0, Inventory.input2Amount[id] - stolenAmount);
+              else if (slot.idx === 3) Inventory.input3Amount[id] = Math.max(0, Inventory.input3Amount[id] - stolenAmount);
+              
+              // Only log occasionally to avoid spam
+              if (Math.random() < 0.01) {
+                  // console.log(`[RETAIL] Shrinkage: Building ${id} lost ${stolenAmount} units to theft/spoilage.`);
+              }
+          }
+      }
 
       // 2. Get Configured Price or default to 150% markup
       let currentPrice = 0
@@ -154,7 +207,46 @@ export const retailSystem = (world: GameWorld) => {
       const adjustedPriceRatio = priceRatio * qualityPriceAdjustment
       const adjustedPriceMult = Math.max(0, 1.5 - (adjustedPriceRatio - 1) * 0.75 * loyaltyFactor)
 
-      const dailyDemand = Math.floor(baseDemand * adjustedPriceMult * expertiseMult * awarenessMult * qualityMult * macroDemandMult * marketLeaderBonus)
+      // ─── HIGH-TECH / OBSOLESCENCE FACTOR ───
+      const productTechLevel = world.techLookup.get(companyId)?.get(slot.prod) || 40
+      const normTech = Math.floor(productTechLevel / 10)
+      
+      // Look up world Era Level (highest global tech level)
+      const globalTechEra = Math.max(...Array.from(world.techLookup.values()).map(m => Math.max(...Array.from(m.values()), 0)), 40)
+      const normGlobal = Math.floor(globalTechEra / 10)
+      
+      // Obsolescence drag: if tech is behind global era, demand drops
+      const techBehind = Math.max(0, normGlobal - normTech)
+      const obsolescenceDrag = Math.max(0.3, 1 - (techBehind * 0.05)) // 5% drop per level behind
+
+      // ─── COMPETITIVE VALUE FACTOR ───
+      const marketInfo = marketMap.get(slot.prod)
+      let competitiveMult = 1.0
+      
+      if (marketInfo) {
+          const avgPrice = marketInfo.avgPrice || currentPrice
+          const avgQuality = marketInfo.avgQuality || productQuality
+          
+          // Value relative to market
+          const myValue = productQuality / (currentPrice / 100)
+          const marketValue = avgQuality / (avgPrice / 100)
+          
+          if (marketValue > 0) {
+              const valueRatio = myValue / marketValue
+              competitiveMult = 0.5 + (Math.min(2.0, valueRatio) * 0.5)
+          }
+      }
+
+      // ─── SATURATION FACTOR (NEW) ───
+      // If there are many stores in this city selling the same product, they share the market
+      const cityConcentration = storeConcentration.get(cityId)?.get(slot.prod) || 1
+      const saturationPenalty = Math.max(0.4, 1.2 / Math.sqrt(cityConcentration)) // 1 store=1.2, 4 stores=0.6, 9 stores=0.4
+
+      const directive = Company.strategicDirective[companyId] || 0
+      let directiveDemandMult = 1.0
+      if (directive === 2) directiveDemandMult = 1.2 // Market Aggression
+
+      const dailyDemand = Math.floor(baseDemand * adjustedPriceMult * expertiseMult * awarenessMult * qualityMult * macroDemandMult * marketLeaderBonus * obsolescenceDrag * competitiveMult * saturationPenalty * directiveDemandMult)
       
       // 4. Process Sales
       const actualSales = Math.min(slot.amt, dailyDemand)
@@ -175,13 +267,43 @@ export const retailSystem = (world: GameWorld) => {
           Finances.cash[ownerId] += revenue;
           // Accumulate Month-to-date Revenue
           if (Company.companyId[id] === ownerId) {
-             Company.revenueLastMonth[id] = (Company.revenueLastMonth[id] || 0) + revenue;
+             Company.currentMonthRevenue[id] = (Company.currentMonthRevenue[id] || 0) + revenue;
           }
         }
 
         if (ownerId === world.playerEntityId) {
           world.cash += revenue;
         }
+
+        // ─── STOCKOUT PENALTY (BRAND LOYALTY DAMAGE) ───
+        // If demand significantly exceeds our supply, customers leave angry
+        if (actualSales === slot.amt && dailyDemand > actualSales * 1.5) {
+            const brandEId = brandCache.get(Company.companyId[id])?.get(slot.prod);
+            if (brandEId && isProcessDay) {
+                // Minor loyalty hit per stockout
+                ProductBrand.loyalty[brandEId] = Math.max(0, ProductBrand.loyalty[brandEId] - 1);
+                
+                // If it's the player's store, maybe trigger a notification occasionally
+                if (ownerId === world.playerEntityId && Math.random() < 0.05) {
+                    const pName = world.dataStore.getProduct(slot.prod)?.name || 'product';
+                    if (typeof window !== 'undefined') {
+                        window.dispatchEvent(new CustomEvent('game-notification', {
+                            detail: {
+                                message: `Stockout! Angry customers couldn't find ${pName} at Retail #${id}. Loyalty dropped.`,
+                                type: 'warning',
+                                timestamp: Date.now()
+                            }
+                        }));
+                    }
+                }
+            }
+        }
+      } else if (slot.amt === 0 && dailyDemand > 0 && isProcessDay) {
+         // Complete stockout with active demand!
+         const brandEId = brandCache.get(Company.companyId[id])?.get(slot.prod);
+         if (brandEId) {
+             ProductBrand.loyalty[brandEId] = Math.max(0, ProductBrand.loyalty[brandEId] - 2);
+         }
       }
     }
 
@@ -194,16 +316,21 @@ export const retailSystem = (world: GameWorld) => {
         const monthlyRent = Math.floor(traffic * size * 500);
         const dailyRent = Math.floor(monthlyRent / 30);
         
+        const directive = Company.strategicDirective[ownerId] || 0
+        let directiveCostMult = 1.0
+        if (directive === 2) directiveCostMult = 1.25 // Market Aggression overhead
+
         if (ownerId > 0 && dailyRent > 0) {
-          Finances.cash[ownerId] -= dailyRent;
+          const finalDailyRent = Math.floor(dailyRent * directiveCostMult);
+          Finances.cash[ownerId] -= finalDailyRent;
           
           // Accumulate Month-to-date Expenses
           if (Company.companyId[id] === ownerId) {
-             Company.expensesLastMonth[id] = (Company.expensesLastMonth[id] || 0) + dailyRent;
+             Company.currentMonthExpenses[id] = (Company.currentMonthExpenses[id] || 0) + finalDailyRent;
           }
 
           if (ownerId === world.playerEntityId) {
-              world.cash -= dailyRent;
+              world.cash -= finalDailyRent;
           }
         }
     }

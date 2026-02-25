@@ -2,10 +2,11 @@ import { useState, useEffect, useRef, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
 import '../styles.css';
 import './MainMenu.css';
+import { LoadGameModal } from './LoadGameModal';
 
 interface MainMenuProps {
   onNewGame: () => void;
-  onLoadGame: () => void;
+  onLoadGame: (slotName: string) => void;
   onSettings: () => void;
   onExit: () => void;
 }
@@ -26,6 +27,7 @@ interface Particle {
 export function MainMenu({ onNewGame, onLoadGame, onSettings, onExit }: MainMenuProps) {
   const { t, i18n } = useTranslation();
   const [hoveredButton, setHoveredButton] = useState<string | null>(null);
+  const [showLoadGame, setShowLoadGame] = useState(false);
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const particlesRef = useRef<Particle[]>([]);
   const mouseRef = useRef({ x: 0, y: 0 });
@@ -236,7 +238,7 @@ export function MainMenu({ onNewGame, onLoadGame, onSettings, onExit }: MainMenu
             </svg>
           </div>
           <h1 className="game-title animate-glow">{t('app.title').toUpperCase()}</h1>
-          <h2 className="game-subtitle">EMPIRE SIMULATION</h2>
+          <h2 className="game-subtitle">{t('app.subtitle')}</h2>
           <p className="game-tagline">{t('app.tagline')}</p>
         </div>
 
@@ -256,14 +258,14 @@ export function MainMenu({ onNewGame, onLoadGame, onSettings, onExit }: MainMenu
             label={t('menu.load_game')}
             description={t('menu.load_game_desc')}
             icon="💾"
-            onClick={onLoadGame}
+            onClick={() => setShowLoadGame(true)}
             isHovered={hoveredButton === 'load'}
             onHover={() => setHoveredButton('load')}
             onLeave={() => setHoveredButton(null)}
           />
           
           <MenuButton
-            label={t('menu.settings').toUpperCase()}
+            label={t('menu.settings')}
             description={t('menu.settings_desc')}
             icon="⚙️"
             onClick={onSettings}
@@ -295,6 +297,16 @@ export function MainMenu({ onNewGame, onLoadGame, onSettings, onExit }: MainMenu
           <span>Open i18n Sync</span>
         </div>
       </div>
+      
+      {showLoadGame && (
+        <LoadGameModal 
+          onLoad={(slotName) => {
+            setShowLoadGame(false);
+            onLoadGame(slotName);
+          }}
+          onClose={() => setShowLoadGame(false)} 
+        />
+      )}
     </div>
   );
 }

@@ -8,8 +8,17 @@ import {
   TechAge,
   ResearchCenter,
   CityEconomicData,
+  Loan,
+  CorporateBond,
+  CompanyFinancials,
 } from '../components'
 import { GameWorld } from '../world'
+
+// Store for extended financial data (loans, bonds)
+export const companyFinancialsStore = new Map<number, CompanyFinancials>()
+
+let nextLoanId = 1
+let nextBondId = 1
 
 /**
  * FinancialSystem — The P&L Engine
@@ -52,13 +61,13 @@ export const financialSystem = (world: GameWorld) => {
       if (cId === 0) continue
 
       const existing = companyTotals.get(cId) || { revenue: 0, expenses: 0 }
-      existing.revenue += Company.revenueLastMonth[bId] || 0
-      existing.expenses += Company.expensesLastMonth[bId] || 0
+      existing.revenue += Company.currentMonthRevenue[bId] || 0
+      existing.expenses += Company.currentMonthExpenses[bId] || 0
       companyTotals.set(cId, existing)
 
       // Reset per-building accumulators for next month
-      Company.revenueLastMonth[bId] = 0
-      Company.expensesLastMonth[bId] = 0
+      Company.currentMonthRevenue[bId] = 0
+      Company.currentMonthExpenses[bId] = 0
     }
 
     // Write company-level totals
@@ -66,10 +75,20 @@ export const financialSystem = (world: GameWorld) => {
       const id = Company.companyId[compId]
       const totals = companyTotals.get(id) || { revenue: 0, expenses: 0 }
 
+      const companyDirectRevenue = Company.currentMonthRevenue[compId] || 0
+      const companyDirectExpenses = Company.currentMonthExpenses[compId] || 0
+      
+      const finalRevenue = totals.revenue + companyDirectRevenue;
+      const finalExpenses = totals.expenses + companyDirectExpenses;
+
       // Store the final monthly figures on the company entity itself
-      Company.revenueLastMonth[compId] = totals.revenue
-      Company.expensesLastMonth[compId] = totals.expenses
-      Company.netIncomeLastMonth[compId] = totals.revenue - totals.expenses
+      Company.revenueLastMonth[compId] = finalRevenue
+      Company.expensesLastMonth[compId] = finalExpenses
+      Company.netIncomeLastMonth[compId] = finalRevenue - finalExpenses
+
+      // Reset direct company accumulators
+      Company.currentMonthRevenue[compId] = 0
+      Company.currentMonthExpenses[compId] = 0
     }
   }
 
@@ -105,7 +124,7 @@ export const financialSystem = (world: GameWorld) => {
       }
 
       // Accumulate into building-level expense tracker
-      Company.expensesLastMonth[id] = (Company.expensesLastMonth[id] || 0) + dailyCost
+      Company.currentMonthExpenses[id] = (Company.currentMonthExpenses[id] || 0) + dailyCost
 
       // Sync player cash
       if (ownerId === world.playerEntityId) {
@@ -149,7 +168,7 @@ export const financialSystem = (world: GameWorld) => {
         Finances.cash[id] -= interest
 
         // Track as expense on the company entity
-        Company.expensesLastMonth[id] = (Company.expensesLastMonth[id] || 0) + interest
+        Company.currentMonthExpenses[id] = (Company.currentMonthExpenses[id] || 0) + interest
 
         if (Company.companyId[id] === world.playerEntityId) {
           world.cash -= interest
@@ -233,7 +252,7 @@ export const financialSystem = (world: GameWorld) => {
 
       if (monthlyPayout > 0 && Finances.cash[id] > monthlyPayout) {
         Finances.cash[id] -= monthlyPayout
-        Company.expensesLastMonth[id] = (Company.expensesLastMonth[id] || 0) + monthlyPayout
+        Company.currentMonthExpenses[id] = (Company.currentMonthExpenses[id] || 0) + monthlyPayout
 
         if (Company.companyId[id] === world.playerEntityId) {
           world.cash -= monthlyPayout
@@ -291,5 +310,414 @@ export const financialSystem = (world: GameWorld) => {
     world.cash = Finances.cash[world.playerEntityId]
   }
 
+  // ═══════════════════════════════════════════════════════════════════════
+  //  8. MONTHLY LOAN & BOND PAYMENTS
+  // ═══════════════════════════════════════════════════════════════════════
+  if (isNewMonth && world.tick > 0) {
+    processLoanPayments(world)
+    processBondPayments(world)
+  }
+
   return world
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// LOAN MANAGEMENT FUNCTIONS
+// ═══════════════════════════════════════════════════════════════════════════
+
+/**
+ * Issue a new loan to a company
+ * @param world GameWorld
+ * @param companyId Company entity ID
+ * @param amount Loan amount in cents
+ * @param termMonths Loan term in months
+ * @returns Loan object or null if rejected
+ */
+export function issueLoan(
+  world: GameWorld,
+  companyId: number,
+  amount: number,
+  termMonths: number = 12
+): Loan | null {
+  if (!hasComponent(world.ecsWorld, Finances, companyId)) {
+    console.error(`[FinancialSystem] Company ${companyId} has no Finances component`)
+    return null
+  }
+
+  const creditLimit = Finances.creditLimit[companyId]
+  const creditRating = Finances.creditRating[companyId]
+  const currentDebt = Finances.debt[companyId]
+
+  // Calculate total debt after loan
+  const totalDebtAfterLoan = currentDebt + amount
+
+  // Check credit limit
+  if (totalDebtAfterLoan > creditLimit) {
+    console.log(`[FinancialSystem] Loan rejected: Exceeds credit limit (${totalDebtAfterLoan} > ${creditLimit})`)
+    return null
+  }
+
+  // Calculate interest rate based on credit rating and market conditions
+  const cityQuery = defineQuery([CityEconomicData])
+  const cityEntities = cityQuery(world.ecsWorld)
+  const baseRate = cityEntities.length > 0
+    ? CityEconomicData.interestRate[cityEntities[0]] || 500
+    : 500
+
+  // Credit spread based on rating (0-100)
+  // Rating 100 = +1%, Rating 0 = +15%
+  const creditSpread = 100 + (100 - creditRating) * 14 // 100 to 1500 bps
+
+  // Term premium (longer = higher rate)
+  const termPremium = Math.floor((termMonths - 12) * 2.5) // +0.025% per month over 12
+
+  const interestRate = baseRate + creditSpread + termPremium
+
+  // Calculate monthly payment using amortization formula
+  const monthlyRate = interestRate / 10000 / 12
+  const monthlyPayment = Math.floor(
+    amount * (monthlyRate * Math.pow(1 + monthlyRate, termMonths)) /
+    (Math.pow(1 + monthlyRate, termMonths) - 1)
+  )
+
+  // Create loan
+  const loan: Loan = {
+    id: nextLoanId++,
+    principal: amount,
+    remaining: amount,
+    interestRate,
+    monthlyPayment,
+    monthsRemaining: termMonths,
+    startTick: world.tick,
+  }
+
+  // Add to company's financials
+  let financials = companyFinancialsStore.get(companyId)
+  if (!financials) {
+    financials = {
+      companyId,
+      loans: [],
+      bonds: [],
+      lastMonthInterestPaid: 0,
+      lastMonthPrincipalPaid: 0,
+      lastMonthCouponPaid: 0,
+      totalInterestPaidYTD: 0,
+    }
+    companyFinancialsStore.set(companyId, financials)
+  }
+  financials.loans.push(loan)
+
+  // Update ECS components
+  Finances.cash[companyId] += amount
+  Finances.debt[companyId] += amount
+
+  console.log(`[FinancialSystem] Loan issued to company ${companyId}: $${amount / 100} at ${interestRate / 100}% for ${termMonths} months`)
+
+  return loan
+}
+
+/**
+ * Process monthly loan payments for all companies
+ */
+function processLoanPayments(world: GameWorld): void {
+  const finQuery = defineQuery([Company, Finances])
+  const companies = finQuery(world.ecsWorld)
+
+  for (const companyId of companies) {
+    const financials = companyFinancialsStore.get(companyId)
+    if (!financials || financials.loans.length === 0) continue
+
+    let totalInterestPaid = 0
+    let totalPrincipalPaid = 0
+    const remainingLoans: Loan[] = []
+
+    for (const loan of financials.loans) {
+      if (loan.monthsRemaining <= 0) continue
+
+      const monthlyRate = loan.interestRate / 10000 / 12
+      const interestPortion = Math.floor(loan.remaining * monthlyRate)
+      const principalPortion = Math.min(loan.monthlyPayment - interestPortion, loan.remaining)
+      const totalPayment = interestPortion + principalPortion
+
+      // Check if company can afford payment
+      if (Finances.cash[companyId] >= totalPayment) {
+        // Make payment
+        Finances.cash[companyId] -= totalPayment
+        Finances.debt[companyId] -= principalPortion
+        loan.remaining -= principalPortion
+        loan.monthsRemaining--
+
+        totalInterestPaid += interestPortion
+        totalPrincipalPaid += principalPortion
+
+        Company.currentMonthExpenses[companyId] = (Company.currentMonthExpenses[companyId] || 0) + totalPayment
+
+        if (companyId === world.playerEntityId) {
+          world.cash -= totalPayment
+        }
+
+        if (loan.monthsRemaining > 0 && loan.remaining > 0) {
+          remainingLoans.push(loan)
+        } else {
+          console.log(`[FinancialSystem] Loan ${loan.id} fully repaid for company ${companyId}`)
+        }
+      } else {
+        // Payment failed - penalty and continue
+        console.warn(`[FinancialSystem] Company ${companyId} missed loan payment of $${totalPayment / 100}`)
+        Finances.creditRating[companyId] = Math.max(0, Finances.creditRating[companyId] - 5)
+        remainingLoans.push(loan)
+      }
+    }
+
+    // Update financials
+    financials.loans = remainingLoans
+    financials.lastMonthInterestPaid = totalInterestPaid
+    financials.lastMonthPrincipalPaid = totalPrincipalPaid
+    financials.totalInterestPaidYTD += totalInterestPaid
+  }
+}
+
+/**
+ * Get company's outstanding loans
+ */
+export function getCompanyLoans(companyId: number): Loan[] {
+  const financials = companyFinancialsStore.get(companyId)
+  return financials ? [...financials.loans] : []
+}
+
+/**
+ * Prepay a loan (partial or full)
+ */
+export function prepayLoan(
+  companyId: number,
+  loanId: number,
+  amount: number
+): boolean {
+  const financials = companyFinancialsStore.get(companyId)
+  if (!financials) return false
+
+  const loan = financials.loans.find(l => l.id === loanId)
+  if (!loan) return false
+
+  const prepayAmount = Math.min(amount, loan.remaining)
+
+  if (Finances.cash[companyId] < prepayAmount) {
+    console.log(`[FinancialSystem] Insufficient funds to prepay loan ${loanId}`)
+    return false
+  }
+
+  Finances.cash[companyId] -= prepayAmount
+  Finances.debt[companyId] -= prepayAmount
+  loan.remaining -= prepayAmount
+
+  if (loan.remaining <= 0) {
+    financials.loans = financials.loans.filter(l => l.id !== loanId)
+    console.log(`[FinancialSystem] Loan ${loanId} fully prepaid for company ${companyId}`)
+  }
+
+  return true
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// CORPORATE BOND FUNCTIONS
+// ═══════════════════════════════════════════════════════════════════════════
+
+/**
+ * Issue corporate bonds
+ * @param world GameWorld
+ * @param companyId Company entity ID
+ * @param faceValue Total face value in cents
+ * @param couponRate Annual coupon rate in basis points
+ * @param maturityMonths Months to maturity
+ * @returns Bond object or null if rejected
+ */
+export function issueCorporateBond(
+  world: GameWorld,
+  companyId: number,
+  faceValue: number,
+  couponRate: number,
+  maturityMonths: number = 60
+): CorporateBond | null {
+  if (!hasComponent(world.ecsWorld, Finances, companyId) || !hasComponent(world.ecsWorld, Stock, companyId)) {
+    console.error(`[FinancialSystem] Company ${companyId} missing Finances or Stock component`)
+    return null
+  }
+
+  const creditRating = Finances.creditRating[companyId]
+  const marketCap = Company.marketCap[companyId]
+  const currentDebt = Finances.debt[companyId]
+
+  // Check if company qualifies for bond issuance
+  // Requirements: Credit rating >= 60, debt-to-market-cap < 50%
+  if (creditRating < 60) {
+    console.log(`[FinancialSystem] Bond issuance rejected: Credit rating too low (${creditRating})`)
+    return null
+  }
+
+  if (currentDebt + faceValue > marketCap * 0.5) {
+    console.log(`[FinancialSystem] Bond issuance rejected: Would exceed 50% debt-to-market-cap`)
+    return null
+  }
+
+  // Determine bond rating based on company credit
+  let bondRating: CorporateBond['bondRating']
+  if (creditRating >= 90) bondRating = 'AAA'
+  else if (creditRating >= 80) bondRating = 'AA'
+  else if (creditRating >= 70) bondRating = 'A'
+  else if (creditRating >= 60) bondRating = 'BBB'
+  else bondRating = 'BB'
+
+  // Issue price may be at discount based on market demand
+  const marketDemand = 1.0 - (100 - creditRating) * 0.002 // 0.8 to 1.0
+  const issuePrice = Math.floor(faceValue * marketDemand)
+
+  // Create bond
+  const bond: CorporateBond = {
+    id: nextBondId++,
+    faceValue,
+    couponRate,
+    issuePrice,
+    maturityMonths,
+    monthsRemaining: maturityMonths,
+    startTick: world.tick,
+    bondRating,
+  }
+
+  // Add to company's financials
+  let financials = companyFinancialsStore.get(companyId)
+  if (!financials) {
+    financials = {
+      companyId,
+      loans: [],
+      bonds: [],
+      lastMonthInterestPaid: 0,
+      lastMonthPrincipalPaid: 0,
+      lastMonthCouponPaid: 0,
+      totalInterestPaidYTD: 0,
+    }
+    companyFinancialsStore.set(companyId, financials)
+  }
+  financials.bonds.push(bond)
+
+  // Update ECS components
+  Finances.cash[companyId] += issuePrice
+  Finances.debt[companyId] += faceValue
+
+  console.log(`[FinancialSystem] Corporate bond issued for company ${companyId}: $${faceValue / 100} face value at ${couponRate / 100}% (${bondRating} rated)`)
+
+  return bond
+}
+
+/**
+ * Process monthly bond coupon payments
+ */
+function processBondPayments(world: GameWorld): void {
+  const finQuery = defineQuery([Company, Finances])
+  const companies = finQuery(world.ecsWorld)
+
+  for (const companyId of companies) {
+    const financials = companyFinancialsStore.get(companyId)
+    if (!financials || financials.bonds.length === 0) continue
+
+    let totalCouponPaid = 0
+    const remainingBonds: CorporateBond[] = []
+
+    for (const bond of financials.bonds) {
+      if (bond.monthsRemaining <= 0) continue
+
+      // Calculate monthly coupon
+      const annualCoupon = bond.faceValue * (bond.couponRate / 10000)
+      const monthlyCoupon = Math.floor(annualCoupon / 12)
+
+      // Check if company can afford coupon
+      if (Finances.cash[companyId] >= monthlyCoupon) {
+        Finances.cash[companyId] -= monthlyCoupon
+        bond.monthsRemaining--
+        totalCouponPaid += monthlyCoupon
+
+        // Track expenses
+        Company.currentMonthExpenses[companyId] = (Company.currentMonthExpenses[companyId] || 0) + monthlyCoupon
+
+        if (bond.monthsRemaining <= 0) {
+          // Bond matured - repay face value
+          if (Finances.cash[companyId] >= bond.faceValue) {
+            Finances.cash[companyId] -= bond.faceValue
+            Finances.debt[companyId] -= bond.faceValue
+            console.log(`[FinancialSystem] Bond ${bond.id} matured and repaid for company ${companyId}`)
+          } else {
+            // Default!
+            console.error(`[FinancialSystem] DEFAULT: Company ${companyId} cannot repay matured bond ${bond.id}`)
+            Finances.creditRating[companyId] = Math.max(0, Finances.creditRating[companyId] - 20)
+            bond.bondRating = 'D' // Default
+            remainingBonds.push(bond)
+          }
+        } else {
+          remainingBonds.push(bond)
+        }
+      } else {
+        // Missed coupon payment
+        console.warn(`[FinancialSystem] Company ${companyId} missed coupon payment on bond ${bond.id}`)
+        Finances.creditRating[companyId] = Math.max(0, Finances.creditRating[companyId] - 10)
+
+        // Downgrade bond rating
+        const ratings: CorporateBond['bondRating'][] = ['AAA', 'AA', 'A', 'BBB', 'BB', 'B', 'CCC', 'D']
+        const currentIdx = ratings.indexOf(bond.bondRating)
+        if (currentIdx < ratings.length - 1) {
+          bond.bondRating = ratings[currentIdx + 1]
+        }
+
+        remainingBonds.push(bond)
+      }
+    }
+
+    financials.bonds = remainingBonds
+    financials.lastMonthCouponPaid = totalCouponPaid
+    financials.totalInterestPaidYTD += totalCouponPaid
+  }
+}
+
+/**
+ * Get company's outstanding bonds
+ */
+export function getCompanyBonds(companyId: number): CorporateBond[] {
+  const financials = companyFinancialsStore.get(companyId)
+  return financials ? [...financials.bonds] : []
+}
+
+/**
+ * Get complete financial summary for a company
+ */
+export function getFinancialSummary(companyId: number): {
+  loans: Loan[]
+  bonds: CorporateBond[]
+  totalDebt: number
+  monthlyDebtService: number
+  weightedAvgInterestRate: number
+} | null {
+  const financials = companyFinancialsStore.get(companyId)
+  if (!financials) return null
+
+  const totalDebt = financials.loans.reduce((sum, l) => sum + l.remaining, 0) +
+                    financials.bonds.reduce((sum, b) => sum + b.faceValue, 0)
+
+  const monthlyLoanPayments = financials.loans.reduce((sum, l) => sum + l.monthlyPayment, 0)
+  const monthlyCouponPayments = financials.bonds.reduce((sum, b) => {
+    return sum + Math.floor(b.faceValue * (b.couponRate / 10000) / 12)
+  }, 0)
+
+  const totalInterestBearing = financials.loans.reduce((sum, l) => sum + l.remaining, 0) +
+                               financials.bonds.reduce((sum, b) => sum + b.faceValue, 0)
+
+  const weightedInterest = totalInterestBearing > 0
+    ? (financials.loans.reduce((sum, l) => sum + l.remaining * l.interestRate, 0) +
+       financials.bonds.reduce((sum, b) => sum + b.faceValue * b.couponRate, 0)) / totalInterestBearing
+    : 0
+
+  return {
+    loans: [...financials.loans],
+    bonds: [...financials.bonds],
+    totalDebt,
+    monthlyDebtService: monthlyLoanPayments + monthlyCouponPayments,
+    weightedAvgInterestRate: weightedInterest,
+  }
 }

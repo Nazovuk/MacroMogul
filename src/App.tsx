@@ -8,7 +8,9 @@ import {
   createCity, 
   createAICompany,
   createCompany,
+  hireRandomExecutive,
 } from './core/ecs/world';
+import { Finances } from './core/ecs/components';
 import { TopBar } from './ui/hud/TopBar';
 import { StockTicker } from './ui/hud/StockTicker';
 import { BottomToolbar } from './ui/hud/BottomToolbar';
@@ -25,8 +27,11 @@ import { SystemMenu } from './ui/components/SystemMenu';
 import { MarketDashboard } from './ui/components/MarketDashboard';
 import { FinancialDashboard } from './ui/components/FinancialDashboard';
 import { StockTrading } from './ui/components/StockTrading';
+import { IntelligenceDashboard } from './ui/components/IntelligenceDashboard';
 import { SettingsModal } from './ui/components/SettingsModal';
 import { NotificationToast } from './ui/components/NotificationToast';
+import { LogisticsDashboard } from './ui/components/LogisticsDashboard';
+import { HQDashboard } from './ui/components/HQDashboard';
 import { PersistenceService } from './core/services/PersistenceService';
 import { CITIES } from './core/data/cities';
 import { Building } from './core/ecs/components';
@@ -52,6 +57,9 @@ function App() {
   const [showMarketDashboard, setShowMarketDashboard] = useState(false);
   const [showFinancialDashboard, setShowFinancialDashboard] = useState(false);
   const [showStockTrading, setShowStockTrading] = useState(false);
+  const [showIntelligenceDashboard, setShowIntelligenceDashboard] = useState(false);
+  const [showLogisticsDashboard, setShowLogisticsDashboard] = useState(false);
+  const [showHQDashboard, setShowHQDashboard] = useState(false);
   const [showSettingsModal, setShowSettingsModal] = useState(false);
   const [selectedBuildingToBuild, setSelectedBuildingToBuild] = useState<BuildingData | null>(null);
   const [selectedEntityId, setSelectedEntityId] = useState<number | null>(null);
@@ -62,43 +70,62 @@ function App() {
 
   const startScenario = async (scenarioId: string) => {
     setGameState('loading');
+    setError(null);
     
+    console.log(`[App] Attempting to start scenario: ${scenarioId}`);
     const scenario = scenarios.find(s => s.id === scenarioId);
-    const startCash = scenario ? scenario.startCash : 10000000;
+    
+    if (!scenario) {
+      const errorMsg = `Scenario not found: ${scenarioId}`;
+      console.error(`[App] ${errorMsg}`);
+      setError(errorMsg);
+      setGameState('menu');
+      return;
+    }
+
+    const startCash = scenario.startCash;
 
     try {
+      // Simulate loading for better UX and state synchronization
       await new Promise(r => setTimeout(r, 800));
 
+      console.log(`[App] Creating world for ${scenario.title} (Seed: 12345)`);
       const newWorld = createGameWorld(12345);
       newWorld.cash = startCash * 100; // Convert dollars to cents
+      
+      console.log(`[App] Initializing game world data stores...`);
       const success = await initializeGameWorld(newWorld);
       
       if (!success) {
-        setError('Failed to initialize game world');
-        setGameState('menu');
+        const errorMsg = 'Failed to initialize game world data. Missing files in public/data?';
+        console.error(`[App] ${errorMsg}`);
+        setError(errorMsg);
+        // Do not force menu immediately; error screen will show the message
         return;
       }
       
-      // Initialize Cities
+      console.log(`[App] Populating Cities (${CITIES.length})...`);
       CITIES.forEach((city, index) => {
         const popValue = parseFloat(city.population);
         const population = city.population.includes('M') ? Math.floor(popValue * 1000000) : Math.floor(popValue);
         createCity(newWorld, city.x, city.y, index + 1, population);
       });
 
-      // Initialize Player Company using unified helper
+      console.log(`[App] Creating Player Company...`);
       const playerEntity = createCompany(newWorld, newWorld.cash);
       newWorld.playerEntityId = playerEntity;
 
-      // Initialize AI Rivals
-      createAICompany(newWorld, "Global Corp", 5000000);
-      createAICompany(newWorld, "Rival Inc", 5000000);
+      console.log(`[App] Creating AI Rivals...`);
+      createAICompany(newWorld, "Global Corp", 500000000); // 5M USD in cents
+      createAICompany(newWorld, "Rival Inc", 500000000); 
 
+      console.log(`[App] Entering PLAYING state.`);
       setWorld(newWorld);
       setGameState('playing');
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Unknown error');
-      setGameState('menu');
+      const errorMsg = err instanceof Error ? err.message : 'Unknown error during game start';
+      console.error(`[App] CRITICAL Error starting scenario:`, err);
+      setError(errorMsg);
     }
   };
 
@@ -202,6 +229,83 @@ function App() {
       window.addEventListener('toggleSystemMenu', handler);
       return () => window.removeEventListener('toggleSystemMenu', handler);
   }, []);
+
+  // Banking Events (Loans)
+  useEffect(() => {
+    const handleRequestLoan = (e: any) => {
+      if (!world || world.playerEntityId <= 0) return;
+      const pid = world.playerEntityId;
+      const amount = e.detail.amount;
+      
+      const available = Finances.creditLimit[pid] - Finances.debt[pid];
+      if (amount <= available) {
+        Finances.cash[pid] += amount;
+        Finances.debt[pid] += amount;
+        world.cash += amount;
+        setWorld({ ...world });
+        
+        window.dispatchEvent(new CustomEvent('notification', { 
+            detail: { message: `Approved: ${amount/100}$ loan credited to your account.`, type: 'info' } 
+        }));
+      } else {
+        window.dispatchEvent(new CustomEvent('notification', { 
+            detail: { message: `Loan Denied: Credit limit reached.`, type: 'warning' } 
+        }));
+      }
+    };
+
+    const handleRepayLoan = (e: any) => {
+      if (!world || world.playerEntityId <= 0) return;
+      const pid = world.playerEntityId;
+      const amount = e.detail.amount;
+      const currentDebt = Finances.debt[pid];
+      const actualRepay = Math.min(amount, currentDebt, Finances.cash[pid]);
+
+      if (actualRepay > 0) {
+        Finances.cash[pid] -= actualRepay;
+        Finances.debt[pid] -= actualRepay;
+        world.cash -= actualRepay;
+        setWorld({ ...world });
+      }
+    };
+
+    window.addEventListener('request-loan', handleRequestLoan);
+    window.addEventListener('repay-loan', handleRepayLoan);
+    
+    const handleRecruitExecutive = () => {
+      if (!world || world.playerEntityId <= 0) return;
+      
+      const recruitmentFee = 10000000; // $100k recruitment fee
+      if (world.cash >= recruitmentFee) {
+        const hire = hireRandomExecutive(world, world.playerEntityId);
+        if (hire) {
+          world.cash -= recruitmentFee;
+          Finances.cash[world.playerEntityId] -= recruitmentFee;
+          setWorld({ ...world });
+          
+          window.dispatchEvent(new CustomEvent('notification', { 
+            detail: { message: `Executive recruited! Welcome to the team.`, type: 'success' } 
+          }));
+        } else {
+          window.dispatchEvent(new CustomEvent('notification', { 
+            detail: { message: `Executive board is full.`, type: 'warning' } 
+          }));
+        }
+      } else {
+        window.dispatchEvent(new CustomEvent('notification', { 
+          detail: { message: `Insufficient funds for recruitment ($100,000 required).`, type: 'danger' } 
+        }));
+      }
+    };
+    
+    window.addEventListener('recruit-executive', handleRecruitExecutive);
+
+    return () => {
+      window.removeEventListener('request-loan', handleRequestLoan);
+      window.removeEventListener('repay-loan', handleRepayLoan);
+      window.removeEventListener('recruit-executive', handleRecruitExecutive);
+    };
+  }, [world]);
   useEffect(() => {
     if (gameState !== 'playing' || isPaused || !world) return;
 
@@ -227,7 +331,7 @@ function App() {
     return (
       <MainMenu
         onNewGame={startNewGame}
-        onLoadGame={(slotName: string) => handleLoadGame(slotName)}
+        onLoadGame={handleLoadGame}
         onSettings={() => setShowSettingsModal(true)}
         onExit={() => window.close()}
       />
@@ -247,8 +351,8 @@ function App() {
     return (
       <div className="loading-screen">
         <div className="loading-spinner"></div>
-        <h2>{isTraveling ? `Traveling to ${currentCityId.replace('city_', 'Region ')}...` : 'Loading Game World...'}</h2>
-        <p>{isTraveling ? 'Establishing local headquarters...' : 'Initializing ECS architecture'}</p>
+        <h2>{isTraveling ? t('mainmenu.traveling_to', { city: currentCityId.replace('city_', 'Region ') }) : t('mainmenu.loading_world')}</h2>
+        <p>{isTraveling ? t('mainmenu.establishing_hq') : t('mainmenu.initializing_ecs')}</p>
       </div>
     );
   }
@@ -256,9 +360,9 @@ function App() {
   if (error) {
     return (
       <div className="error-screen">
-        <h1>Error</h1>
+        <h1>{t('mainmenu.error')}</h1>
         <p>{error}</p>
-        <button onClick={() => setGameState('menu')}>Back to Menu</button>
+        <button onClick={() => setGameState('menu')}>{t('mainmenu.back_to_menu')}</button>
       </div>
     );
   }
@@ -291,6 +395,18 @@ function App() {
           setShowStockTrading(true);
           setSelectedEntityId(null);
         }}
+        onOpenIntelligence={() => {
+          setShowIntelligenceDashboard(true);
+          setSelectedEntityId(null);
+        }}
+        onOpenLogistics={() => {
+          setShowLogisticsDashboard(true);
+          setSelectedEntityId(null);
+        }}
+        onOpenHQ={() => {
+          setShowHQDashboard(true);
+          setSelectedEntityId(null);
+        }}
       />
 
       {gameState === 'playing' && world && <StockTicker world={world} />}
@@ -319,11 +435,11 @@ function App() {
         {selectedBuildingToBuild && (
           <div className="build-preview-bar animate-fadeIn">
             <div className="preview-info">
-              <span className="preview-label">PLACING:</span>
-              <span className="preview-value">{(t(`buildings.${selectedBuildingToBuild.name}`) || selectedBuildingToBuild.name).toUpperCase()}</span>
+              <span className="preview-label">{t('mainmenu.placing')}</span>
+              <span className="preview-value">{t(`buildings.${selectedBuildingToBuild.name}`, { defaultValue: selectedBuildingToBuild.name }).toUpperCase()}</span>
             </div>
             <button className="cancel-build-btn" onClick={() => setSelectedBuildingToBuild(null)}>
-              CANCEL (ESC)
+              {t('mainmenu.cancel_esc')}
             </button>
           </div>
         )}
@@ -346,7 +462,6 @@ function App() {
         {showBuildMenu && world && (
           <BuildMenu
             buildings={Array.from(world.dataStore.buildings.values())}
-            playerCash={world.cash}
             onSelectBuilding={(building) => {
               setSelectedBuildingToBuild(building);
               setShowBuildMenu(false);
@@ -439,6 +554,7 @@ function App() {
           <FinancialDashboard
              world={world}
              onClose={() => setShowFinancialDashboard(false)}
+             onUpdate={() => setWorld({ ...world })}
           />
       )}
 
@@ -449,12 +565,32 @@ function App() {
           />
       )}
 
+      {showIntelligenceDashboard && world && (
+          <IntelligenceDashboard
+             world={world}
+             onClose={() => setShowIntelligenceDashboard(false)}
+          />
+      )}
+
+      {showLogisticsDashboard && world && (
+          <LogisticsDashboard
+             world={world}
+             onClose={() => setShowLogisticsDashboard(false)}
+          />
+      )}
+
+      {showHQDashboard && world && (
+          <HQDashboard
+             world={world}
+             onClose={() => setShowHQDashboard(false)}
+             onUpdate={() => setWorld({ ...world })}
+          />
+      )}
+
       {showSettingsModal && (
           <SettingsModal
              isOpen={showSettingsModal}
              onClose={() => setShowSettingsModal(false)}
-             currentSpeed={gameSpeed}
-             onSpeedChange={handleSpeedChange}
           />
       )}
     </div>

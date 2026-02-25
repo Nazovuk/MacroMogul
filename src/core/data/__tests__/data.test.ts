@@ -171,9 +171,10 @@ describe('DataStore', () => {
 
   describe('initializeFromData', () => {
     it('should store products and buildings', () => {
+      const defaultTech = { techLevel: 1, expertiseRequired: 1, knowledgePoints: 10, innovationRate: 1.0 }
       const products = [
-        { id: 1, name: 'Wheat', category: ProductCategory.RAW, basePrice: 10, baseDemand: 100, unitWeight: 1, perishable: false, qualitySensitive: false },
-        { id: 2, name: 'Bread', category: ProductCategory.CONSUMER, basePrice: 40, baseDemand: 120, unitWeight: 1, perishable: true, qualitySensitive: true },
+        { id: 1, name: 'Wheat', category: ProductCategory.RAW, basePrice: 10, baseDemand: 100, unitWeight: 1, perishable: false, qualitySensitive: false, ...defaultTech },
+        { id: 2, name: 'Bread', category: ProductCategory.CONSUMER, basePrice: 40, baseDemand: 120, unitWeight: 1, perishable: true, qualitySensitive: true, ...defaultTech },
       ]
       
       const buildings = [
@@ -191,10 +192,11 @@ describe('DataStore', () => {
     })
 
     it('should filter products by category', () => {
+      const defaultTech = { techLevel: 1, expertiseRequired: 1, knowledgePoints: 10, innovationRate: 1.0 }
       const products = [
-        { id: 1, name: 'Wheat', category: ProductCategory.RAW, basePrice: 10, baseDemand: 100, unitWeight: 1, perishable: false, qualitySensitive: false },
-        { id: 2, name: 'Flour', category: ProductCategory.INTERMEDIATE, basePrice: 25, baseDemand: 90, unitWeight: 1, perishable: false, qualitySensitive: true },
-        { id: 3, name: 'Bread', category: ProductCategory.CONSUMER, basePrice: 40, baseDemand: 120, unitWeight: 1, perishable: true, qualitySensitive: true },
+        { id: 1, name: 'Wheat', category: ProductCategory.RAW, basePrice: 10, baseDemand: 100, unitWeight: 1, perishable: false, qualitySensitive: false, ...defaultTech },
+        { id: 2, name: 'Flour', category: ProductCategory.INTERMEDIATE, basePrice: 25, baseDemand: 90, unitWeight: 1, perishable: false, qualitySensitive: true, ...defaultTech },
+        { id: 3, name: 'Bread', category: ProductCategory.CONSUMER, basePrice: 40, baseDemand: 120, unitWeight: 1, perishable: true, qualitySensitive: true, ...defaultTech },
       ]
 
       store.initializeFromData(products, [])
@@ -233,9 +235,10 @@ describe('DataStore', () => {
     })
 
     it('should get all IDs', () => {
+      const defaultTech = { techLevel: 1, expertiseRequired: 1, knowledgePoints: 10, innovationRate: 1.0 }
       const products = [
-        { id: 1, name: 'Wheat', category: ProductCategory.RAW, basePrice: 10, baseDemand: 100, unitWeight: 1, perishable: false, qualitySensitive: false },
-        { id: 2, name: 'Bread', category: ProductCategory.CONSUMER, basePrice: 40, baseDemand: 120, unitWeight: 1, perishable: true, qualitySensitive: true },
+        { id: 1, name: 'Wheat', category: ProductCategory.RAW, basePrice: 10, baseDemand: 100, unitWeight: 1, perishable: false, qualitySensitive: false, ...defaultTech },
+        { id: 2, name: 'Bread', category: ProductCategory.CONSUMER, basePrice: 40, baseDemand: 120, unitWeight: 1, perishable: true, qualitySensitive: true, ...defaultTech },
       ]
 
       store.initializeFromData(products, [])

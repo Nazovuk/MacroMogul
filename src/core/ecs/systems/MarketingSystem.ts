@@ -2,6 +2,7 @@ import { defineQuery, addEntity, addComponent } from 'bitecs'
 import { Building, MarketingOffice, Company, ProductBrand, Finances } from '../components'
 import { GameWorld } from '../world'
 
+
 /**
  * MarketingSystem — Brand Awareness & Campaign Engine
  *
@@ -13,6 +14,8 @@ import { GameWorld } from '../world'
  *   1 = Digital       → Targeted, cost-effective, strong ROI tracking
  *   2 = Premium       → Low reach but high loyalty conversion (luxury brands)
  *   3 = Guerilla      → Cheap, viral potential, random effectiveness
+ *   4 = PR Campaign   → Mitigates bad news, protects share price and reputation
+ *
  *
  * Data Flow:
  *   MarketingOffice.spending → brand awareness growth
@@ -25,7 +28,8 @@ import { GameWorld } from '../world'
  *   - Monthly (30 ticks): Campaign effects, ROI calculation, market share update
  */
 
-const TICKS_PER_MONTH = 30
+const TICKS_PER_DAY = 30
+const TICKS_PER_MONTH = 900 // 30 days * 30 ticks
 
 // Campaign effectiveness multipliers: [awarenessGrowth, loyaltyGrowth, costEfficiency, reachMultiplier]
 const CAMPAIGN_PROFILES: Record<number, { awareness: number; loyalty: number; cost: number; reach: number }> = {
@@ -33,6 +37,7 @@ const CAMPAIGN_PROFILES: Record<number, { awareness: number; loyalty: number; co
   1: { awareness: 0.8, loyalty: 0.5, cost: 0.6, reach: 1.2 },  // Digital
   2: { awareness: 0.4, loyalty: 1.5, cost: 2.0, reach: 0.3 },  // Premium
   3: { awareness: 0.6, loyalty: 0.2, cost: 0.3, reach: 0.5 },  // Guerilla
+  4: { awareness: 0.2, loyalty: 0.8, cost: 1.5, reach: 0.4 },  // PR Campaign
 }
 
 // Demographic targeting bonuses (when campaign matches target)
@@ -45,10 +50,13 @@ const DEMOGRAPHIC_BONUSES: Record<number, { awarenessBoost: number; loyaltyBoost
 }
 
 export const marketingSystem = (world: GameWorld) => {
+  const isNewDay = world.tick % TICKS_PER_DAY === 0
+  const isNewMonth = world.tick % TICKS_PER_MONTH === 0
+
+  if (!isNewDay) return world
+
   const marketingQuery = defineQuery([Building, MarketingOffice, Company])
   const entities = marketingQuery(world.ecsWorld)
-
-  const isMonthEnd = world.tick % TICKS_PER_MONTH === 0 && world.tick > 0
 
   // Track total ad spend per product+company for market share calculation
   const adSpendByProduct = new Map<string, { entityId: number; spend: number; awareness: number }[]>()
@@ -68,8 +76,8 @@ export const marketingSystem = (world: GameWorld) => {
     const campaign = CAMPAIGN_PROFILES[campaignType] || CAMPAIGN_PROFILES[0]
     const demBonus = DEMOGRAPHIC_BONUSES[demographic] || DEMOGRAPHIC_BONUSES[0]
 
-    // ─── Financial Deduction (prorated daily) ───
-    if (spending > 0 && isMonthEnd) {
+    // ─── Financial Deduction (prorated monthly) ───
+    if (spending > 0 && isNewMonth) {
       const monthlyCost = Math.floor(spending * campaign.cost)
       Finances.cash[companyId] -= monthlyCost
       if (companyId === world.playerEntityId) {
@@ -80,24 +88,34 @@ export const marketingSystem = (world: GameWorld) => {
     // Find or create the brand entity
     const brandEntity = findOrCreateProductBrand(world, companyId, productId)
 
-    // ─── Campaign Effects (monthly) ───
-    if (isMonthEnd && spending > 0) {
+    // ─── Awareness Growth (Daily) ───
+    if (spending > 0) {
       // Growth scales: $10K monthly = 1.0 base factor, diminishing returns above
-      const spendFactor = Math.sqrt(spending / 1_000_000) // Diminishing returns
+      const spendFactorDay = Math.sqrt(spending / 1_000_000) / 30 
+      const efficiencyMult = (efficiency / 100) * 1.5 
+      const directive = Company.strategicDirective[companyId] || 0
+      let directiveAwarenessMult = 1.0
+      if (directive === 2) directiveAwarenessMult = 1.1 // Market Aggression
+
+      const rawAwarenessGrowth = spendFactorDay * campaign.awareness * demBonus.awarenessBoost * efficiencyMult * directiveAwarenessMult
+      const currentAwareness = ProductBrand.awareness[brandEntity]
+      const diminishingFactor = 1 - (currentAwareness / 120) 
+      const finalAwarenessGrowth = Math.max(0, rawAwarenessGrowth * diminishingFactor)
+      ProductBrand.awareness[brandEntity] = Math.min(100, currentAwareness + finalAwarenessGrowth)
+    }
+
+    // ─── Monthly Deep Metrics (Loyalty, Reach, PR) ───
+    if (isNewMonth && spending > 0) {
+      const spendFactor = Math.sqrt(spending / 1_000_000)
       const efficiencyMult = (efficiency / 100) * 1.5 // 0 eff → 0, 100 eff → 1.5x
 
-      // 1. Awareness Growth
-      const rawAwarenessGrowth = spendFactor * campaign.awareness * demBonus.awarenessBoost * efficiencyMult
-      const currentAwareness = ProductBrand.awareness[brandEntity]
+      // 1. Awareness Growth (Removed from monthly because it's daily now)
+      // 1. Loyalty Growth (slower, requires sustained campaigns)
+      const directive = Company.strategicDirective[companyId] || 0
+      let directiveLoyaltyMult = 1.0
+      if (directive === 1) directiveLoyaltyMult = 1.1 // Quality Leadership builds loyalty faster
 
-      // Harder to gain awareness when already high (diminishing returns)
-      const diminishingFactor = 1 - (currentAwareness / 120) // At 100, only 17% effective
-      const finalAwarenessGrowth = Math.max(0, rawAwarenessGrowth * diminishingFactor)
-
-      ProductBrand.awareness[brandEntity] = Math.min(100, currentAwareness + finalAwarenessGrowth)
-
-      // 2. Loyalty Growth (slower, requires sustained campaigns)
-      const rawLoyaltyGrowth = spendFactor * campaign.loyalty * demBonus.loyaltyBoost * efficiencyMult * 0.5
+      const rawLoyaltyGrowth = spendFactor * campaign.loyalty * demBonus.loyaltyBoost * efficiencyMult * 0.5 * directiveLoyaltyMult
       const currentLoyalty = ProductBrand.loyalty[brandEntity]
       const loyaltyDiminishing = 1 - (currentLoyalty / 130) // Even harder to max
       const finalLoyaltyGrowth = Math.max(0, rawLoyaltyGrowth * loyaltyDiminishing)
@@ -114,6 +132,83 @@ export const marketingSystem = (world: GameWorld) => {
       // 5. Company reputation bonus
       const reputation = Company.reputation[companyId] || 50
       ProductBrand.reputationBonus[brandEntity] = Math.floor(reputation / 5) // 0-20 bonus
+
+      // 6. PR Campaign: Crisis Mitigation (New)
+      if (campaignType === 4 && spending > 100000) { // $1K+ min for PR impact
+        const alerts = world.techAlerts.get(companyId);
+        if (alerts && alerts.size > 0) {
+            // PR works by 'spinning' the news, reducing the panic penalty
+            // We'll store a "PR Shield" value in a new property (or reputation)
+            const prPower = Math.min(1.0, Math.sqrt(spending / 10_000_000)); 
+            
+            // Boost reputation faster during crises to counteract bad PR
+            Company.reputation[companyId] = Math.min(100, (Company.reputation[companyId] || 50) + (prPower * 5));
+        }
+
+        // ─── DISINFORMATION CAMPAIGN (ATTACK LEADER) ───
+        // If it's a PR campaign but no internal crisis exists, and demographic is 'All' (0)
+        // It acts as a smear campaign against the market leader
+        if (demographic === 0 && spending > 500000 && (!alerts || alerts.size === 0)) {
+            // Find market leader
+            let leaderId = companyId;
+            let highestShare = ProductBrand.marketShare[brandEntity] || 0;
+            
+            const brandQuery = defineQuery([ProductBrand]);
+            brandQuery(world.ecsWorld).forEach(bid => {
+                if (ProductBrand.productId[bid] === productId) {
+                    const share = ProductBrand.marketShare[bid] || 0;
+                    if (share > highestShare) {
+                        highestShare = share;
+                        leaderId = ProductBrand.companyId[bid];
+                    }
+                }
+            });
+
+            if (leaderId !== companyId && highestShare > 30) {
+                // Success chance based on spending vs leader's reputation
+                const leaderRep = Company.reputation[leaderId] || 50;
+                const attackPower = Math.min(0.8, spending / 10_000_000);
+                
+                if (Math.random() < attackPower && leaderRep > 20) {
+                    const dmg = 4 + Math.floor(Math.random() * 6); // 4-10 rep damage
+                    Company.reputation[leaderId] = Math.max(0, leaderRep - dmg);
+                    
+                    if (Math.random() < 0.3) { // 30% chance to make the news
+                        const pName = world.dataStore.getProduct(productId)?.name || 'product';
+                        const leaderName = leaderId === world.playerEntityId ? 'Player' : `Competitor ${leaderId}`;
+                        world.newsFeed.unshift({
+                            id: `smear_${companyId}_${world.tick}`,
+                            type: 'market',
+                            title: 'Corporate Smear Campaign',
+                            content: `A highly funded anonymous PR campaign has severely damaged the public image of ${leaderName} in the ${pName} sector.`,
+                            timestamp: Date.now()
+                        });
+                        if (world.newsFeed.length > 50) world.newsFeed.pop();
+                    }
+                }
+            }
+        }
+      }
+
+      // ─── VIRAL MARKETING (GUERRILLA SPIKE) ───
+      // Guerrilla marketing (type 3) has a small chance to go massive
+      if (campaignType === 3 && Math.random() < 0.05) { // 5% chance per month
+          ProductBrand.awareness[brandEntity] = Math.min(100, ProductBrand.awareness[brandEntity] + 15);
+          ProductBrand.loyalty[brandEntity] = Math.min(100, ProductBrand.loyalty[brandEntity] + 5);
+          
+          if (Math.random() < 0.5) { // 50% chance to log
+             const pName = world.dataStore.getProduct(productId)?.name || 'product';
+             const compName = companyId === world.playerEntityId ? 'Player' : `Competitor ${companyId}`;
+             world.newsFeed.unshift({
+                  id: `viral_${companyId}_${world.tick}`,
+                  type: 'market',
+                  title: 'Viral Sensation!',
+                  content: `${compName}'s guerrilla marketing campaign for their ${pName} has gone totally viral on social media!`,
+                  timestamp: Date.now()
+              });
+              if (world.newsFeed.length > 50) world.newsFeed.pop();
+          }
+      }
     }
 
     // Track for market share calculation
@@ -146,7 +241,7 @@ export const marketingSystem = (world: GameWorld) => {
   }
 
   // ─── Market Share Calculation (monthly) ───
-  if (isMonthEnd) {
+  if (isNewMonth) {
     for (const [, brands] of adSpendByProduct) {
       const totalAwareness = brands.reduce((sum, b) => sum + b.awareness, 0)
       if (totalAwareness <= 0) continue

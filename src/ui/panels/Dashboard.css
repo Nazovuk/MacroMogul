@@ -1,9 +1,9 @@
 .dashboard-container {
   position: fixed;
-  top: 160px;
+  top: 180px;
   left: 24px;
   right: 24px;
-  bottom: 100px;
+  bottom: 90px;
   display: flex;
   flex-direction: column;
   gap: 16px;
@@ -24,12 +24,13 @@
 .dashboard-tabs {
   display: flex;
   gap: 12px;
-  padding: 8px;
-  background: rgba(22, 33, 62, 0.6);
-  backdrop-filter: blur(20px);
-  border: 1px solid rgba(255, 255, 255, 0.1);
-  border-radius: 16px;
-  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
+  padding: 10px;
+  background: rgba(15, 23, 42, 0.6);
+  backdrop-filter: blur(24px);
+  -webkit-backdrop-filter: blur(24px);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 20px;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.4);
 }
 
 .tab-btn {
@@ -80,13 +81,14 @@
 .dashboard-content {
   flex: 1 1 0;
   min-height: 0;
-  background: rgba(22, 33, 62, 0.4);
-  backdrop-filter: blur(20px);
-  border: 1px solid rgba(255, 255, 255, 0.1);
-  border-radius: 16px;
+  background: rgba(15, 23, 42, 0.45);
+  backdrop-filter: blur(24px);
+  -webkit-backdrop-filter: blur(24px);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 20px;
   overflow-y: scroll;
   overflow-x: hidden;
-  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.4);
+  box-shadow: 0 12px 48px rgba(0, 0, 0, 0.5);
 }
 
 
@@ -157,28 +159,22 @@
 /* Glass Cards */
 .glass-card {
   position: relative;
-  background: linear-gradient(145deg, rgba(22, 33, 62, 0.8) 0%, rgba(26, 26, 46, 0.8) 100%);
+  background: rgba(30, 41, 59, 0.45);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
   border: 1px solid rgba(255, 255, 255, 0.1);
-  border-radius: 12px;
-  padding: 20px;
-  transition: all 0.3s ease;
+  border-radius: 18px;
+  padding: 24px;
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
   overflow: hidden;
-}
-
-.glass-card::before {
-  content: '';
-  position: absolute;
-  top: 0;
-  left: 0;
-  right: 0;
-  height: 1px;
-  background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.2), transparent);
+  box-shadow: 0 4px 24px rgba(0, 0, 0, 0.25);
 }
 
 .glass-card:hover {
-  transform: translateY(-4px);
+  transform: translateY(-6px);
   border-color: rgba(255, 255, 255, 0.2);
-  box-shadow: 0 12px 40px rgba(0, 0, 0, 0.4);
+  background: rgba(30, 41, 59, 0.55);
+  box-shadow: 0 15px 45px rgba(0, 0, 0, 0.45);
 }
 
 .card-glow {
@@ -616,6 +612,12 @@
 
 /* Management Panel */
 .management-grid {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+
+.management-top-row {
   display: grid;
   grid-template-columns: 1fr 1fr;
   gap: 20px;
@@ -1160,4 +1162,48 @@
   border-color: #00d9a5;
   color: #00d9a5;
   box-shadow: 0 0 15px rgba(0, 217, 165, 0.3);
+}
+
+/* Executive Cards */
+.exec-card {
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  cursor: default;
+}
+
+.exec-card.vacant {
+  opacity: 0.6;
+  filter: grayscale(0.5);
+}
+
+.exec-card.active {
+  background: rgba(0, 217, 165, 0.08) !important;
+  border-color: rgba(0, 217, 165, 0.3) !important;
+  box-shadow: 0 8px 24px rgba(0, 217, 165, 0.1);
+}
+
+.exec-card.active:hover {
+  transform: translateY(-4px);
+  background: rgba(0, 217, 165, 0.12) !important;
+  border-color: rgba(0, 217, 165, 0.5) !important;
+}
+
+.loyalty-bar {
+  overflow: hidden;
+  position: relative;
+}
+
+.loyalty-bar div {
+  transition: width 1s ease-in-out;
+}
+
+.recruit-btn {
+  background: linear-gradient(135deg, rgba(0, 217, 165, 0.2) 0%, rgba(0, 217, 165, 0.1) 100%);
+  border-color: rgba(0, 217, 165, 0.3);
+  color: #00d9a5;
+}
+
+.recruit-btn:hover {
+  background: linear-gradient(135deg, rgba(0, 217, 165, 0.3) 0%, rgba(0, 217, 165, 0.2) 100%);
+  border-color: rgba(0, 217, 165, 0.5);
+  box-shadow: 0 0 20px rgba(0, 217, 165, 0.2);
 }

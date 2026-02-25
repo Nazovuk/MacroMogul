@@ -36,8 +36,15 @@ import {
   ManagementUnit,
   Stock,
   KnowledgePoints,
-  MarketCompetition
+  MarketCompetition,
+  PowerConsumer,
+  PollutionEmitter,
+  RDCenter,
+  Warehouse,
+  Loan,
+  CorporateBond,
 } from '../ecs/components'
+import { companyFinancialsStore } from '../ecs/systems/FinancialSystem'
 
 // Define a schema for our save file
 interface SaveFile {
@@ -50,6 +57,7 @@ interface SaveFile {
     seed: number
   }
   entities: ArchivedEntity[]
+  financials?: Record<number, { loans: Loan[], bonds: CorporateBond[] }> // Extended financial data
 }
 
 interface ArchivedEntity {
@@ -96,7 +104,11 @@ export const PersistenceService = {
     'ManagementUnit': ManagementUnit,
     'Stock': Stock,
     'KnowledgePoints': KnowledgePoints,
-    'MarketCompetition': MarketCompetition
+    'MarketCompetition': MarketCompetition,
+    'PowerConsumer': PowerConsumer,
+    'PollutionEmitter': PollutionEmitter,
+    'RDCenter': RDCenter,
+    'Warehouse': Warehouse,
   } as Record<string, any>,
 
   /**
@@ -144,6 +156,17 @@ export const PersistenceService = {
         }
       }
 
+      // Collect extended financial data (loans & bonds)
+      const financialsData: Record<number, { loans: Loan[], bonds: CorporateBond[] }> = {}
+      for (const [companyId, finData] of companyFinancialsStore.entries()) {
+        if (finData.loans.length > 0 || finData.bonds.length > 0) {
+          financialsData[companyId] = {
+            loans: finData.loans,
+            bonds: finData.bonds
+          }
+        }
+      }
+
       const saveFile: SaveFile = {
         meta: {
           version: '1.0.0',
@@ -153,7 +176,8 @@ export const PersistenceService = {
           date: { day: world.day, month: world.month, year: world.year },
           seed: world.seed
         },
-        entities: archived
+        entities: archived,
+        financials: Object.keys(financialsData).length > 0 ? financialsData : undefined
       }
 
       const json = JSON.stringify(saveFile)
@@ -258,6 +282,26 @@ export const PersistenceService = {
         }
       }
 
+      // 5. Restore Extended Financial Data (Loans & Bonds)
+      if (saveFile.financials) {
+        companyFinancialsStore.clear()
+        for (const [oldCompanyId, finData] of Object.entries(saveFile.financials)) {
+          const newCompanyId = restorationMap.get(parseInt(oldCompanyId))
+          if (newCompanyId) {
+            companyFinancialsStore.set(newCompanyId, {
+              companyId: newCompanyId,
+              loans: finData.loans || [],
+              bonds: finData.bonds || [],
+              lastMonthInterestPaid: 0,
+              lastMonthPrincipalPaid: 0,
+              lastMonthCouponPaid: 0,
+              totalInterestPaidYTD: 0,
+            })
+          }
+        }
+        console.log(`Restored financial data for ${Object.keys(saveFile.financials).length} companies`)
+      }
+
       console.log("Game loaded successfully.")
       return world
     } catch (err) {
@@ -269,23 +313,23 @@ export const PersistenceService = {
   /**
    * Get list of used slots
    */
-  getAvailableSaves: (): { slot: string, meta: any }[] => {
-     const saves = []
-     for (let i = 0; i < localStorage.length; i++) {
-        const key = localStorage.key(i)
-        if (key && key.startsWith(STORAGE_PREFIX)) {
-           try {
-             const json = localStorage.getItem(key)
-             if (json) {
-                const data = JSON.parse(json)
-                saves.push({
-                   slot: key.replace(STORAGE_PREFIX, ''),
-                   meta: data.meta
-                })
-             }
-           } catch (e) { /* ignore corrupt */ }
-        }
-     }
-     return saves.sort((a,b) => b.meta.timestamp - a.meta.timestamp)
+  getAvailableSaves: (): { slot: string; meta: any }[] => {
+    const saves: { slot: string; meta: any }[] = []
+    for (let i = 0; i < localStorage.length; i++) {
+      const key = localStorage.key(i)
+      if (key && key.startsWith(STORAGE_PREFIX)) {
+        try {
+          const json = localStorage.getItem(key)
+          if (json) {
+            const data = JSON.parse(json)
+            saves.push({
+              slot: key.replace(STORAGE_PREFIX, ''),
+              meta: data.meta
+            })
+          }
+        } catch (e) { /* ignore corrupt */ }
+      }
+    }
+    return saves.sort((a: { slot: string; meta: any }, b: { slot: string; meta: any }) => b.meta.timestamp - a.meta.timestamp)
   }
 }

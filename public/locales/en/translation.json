@@ -7,13 +7,23 @@
     "rd_expenses": "R&D Expenses",
     "net_income": "Net Income",
     "net_income_last_month": "Net Income (Last Month)",
-    "income_statement": "Income Statement",
+    "net_cash": "Net Cash",
+    "your_corp": "Your Corp",
+    "competitor_a": "Competitor A",
+    "competitor_b": "Competitor B",
+    "competitor_c": "Competitor C",
+    "others": "Others",
     "balance_sheet": "Balance Sheet",
     "pl_trend": "P&L Trend",
     "market_share": "Market Share",
     "operating_margin": "Operating Margin",
     "debt_equity": "Debt/Equity",
     "equity": "Equity",
+    "title": "FINANCE",
+    "available_credit": "AVAILABLE CREDIT",
+    "repay_loan": "REPAY LOAN",
+    "assets": "Assets",
+    "debt": "Debt",
     "comprehensive_view": "Comprehensive financial analysis and reporting",
     "cash_on_hand": "Cash on Hand",
     "total_assets": "Total Assets",
@@ -40,18 +50,50 @@
     "high_inflation_warning": "High inflation significantly impacting profits",
     "high_tax_warning": "Tax burden is substantial",
     "macro_healthy": "Macro conditions favorable",
-    "macro_impact": "Macro Impact"
+    "macro_impact": "Macro Impact",
+    "months": "months",
+    "remaining": "remaining",
+    "mo": "mo",
+    "income_statement": "Income Statement",
+    "income_statement_subtitle": "Comprehensive Income Statement (P&L)",
+    "gross_revenue": "Gross Revenue",
+    "operating_expenses_opex": "Operating Expenses (OPEX)",
+    "facility_maintenance_rent": "Facility Maintenance & Rent",
+    "executive_compensation": "Executive Compensation",
+    "marketing_advertising": "Marketing & Advertising",
+    "rd_expenses_short": "Research & Development (R&D)",
+    "logistics_shrinkage_misc": "Logistics, Shrinkage & Misc",
+    "loan_approved": "Loan approved: {{amount}} at {{rate}}%",
+    "loan_rejected": "Loan applications rejected by the central bank",
+    "repay_full": "REPAY FULL",
+    "recession_warning": "City is in recession! Purchasing power is plummeting.",
+    "erosion_impact_divider": "Erosion & External Impact",
+    "tax_erosion": "Corporate Tax Erosion",
+    "insufficient_funds": "Insufficient funds to complete transaction."
+  },
+  "hq": {
+    "executive_team": "Executive Team (HQ)",
+    "recruit_desc": "Recruit top talent to manage your empire. Executives passively boost your operations globally based on their expertise and loyalty.",
+    "signing_bonus": "Signing Bonus",
+    "salary_monthly": "Salary (Monthly)",
+    "active": "ACTIVE",
+    "vacant": "VACANT",
+    "fire_executive": "Fire Executive",
+    "hire_candidate": "Hire Candidate",
+    "hired_success": "Successfully hired {{title}}.",
+    "executive_let_go": "Executive let go.",
+    "perk_coo": "Boosts Global Factory Efficiency by up to +5%",
+    "perk_cto": "Boosts R&D speed and Base Product Quality",
+    "perk_cmo": "Boosts Brand Awareness and Customer Reach",
+    "perk_cfo": "Reduces interest rates and improves credit rating",
+    "perk_chro": "Boosts Global Morale and reduces training costs"
   },
   "logistics": {
-    "title": "Logistics & Supply Chain",
-    "subtitle": "Monitor product flows and optimize supply routes",
-    "active_flows": "Active Flows",
-    "total_cost": "Transport Cost",
-    "avg_distance": "Avg Distance",
-    "shortages": "Shortages"
+    "show_flow": "SHOW FLOW"
   },
   "app": {
     "title": "MacroMogul",
+    "subtitle": "EMPIRE SIMULATION",
     "tagline": "Global Empire Simulation",
     "game_date": "Game Date"
   },
@@ -63,11 +105,11 @@
     "settings": "Settings",
     "settings_desc": "Customize your experience",
     "new_game": "NEW GAME",
-    "new_game_desc": "Start a new business empire",
+    "new_game_desc": "Start a fresh corporate legacy",
     "load_game": "LOAD GAME",
-    "load_game_desc": "Continue your journey",
+    "load_game_desc": "Return to your industrial empire",
     "exit": "EXIT",
-    "exit_desc": "Return to desktop",
+    "exit_desc": "Safe shutdown of all systems",
     "build": "Build",
     "build_desc": "Construct structures",
     "manage_desc": "Corporate & Finance",
@@ -98,7 +140,75 @@
     "high_risk": "High Disruption Risk",
     "financial_overview": "Financial Overview",
     "logistics": "Logistics",
-    "economy": "Economy"
+    "economy": "Economy",
+    "intelligence_center": "Intelligence Center"
+  },
+  "personality": {
+    "aggressive": "Aggressive",
+    "balanced": "Balanced",
+    "conservative": "Conservative"
+  },
+  "threat_level": {
+    "high": "High",
+    "medium": "Medium",
+    "low": "Low"
+  },
+  "intelligence": {
+    "rival_profiles": "Rival Profiles",
+    "market_watch": "Market Watch",
+    "news_feed": "News Feed",
+    "tech_alert": "Tech Alert: {{count}} of your products are becoming obsolete!",
+    "price_war_alert": "Price War: Competitors are slashing prices on {{product}}!",
+    "active_alerts": "Active Alerts & Signals",
+    "active_alerts_desc": "Real-time analysis of competitor behavior and market signals.",
+    "no_threats": "No critical competitive threats detected.",
+    "standby_news": "Stand by for incoming intelligence reports...",
+    "just_now": "Just now",
+    "rating": "Rating",
+    "threat": "Threat",
+    "dominance": "Dominance",
+    "debt_ratio": "Debt Ratio",
+    "market_cap": "Market Cap",
+    "competitor_x": "Competitor {{id}}"
+  },
+  "strategic_reasons": {
+    "obsolete_tech": "Obsolete technology detected in sector",
+    "market_panic": "Brand perception crisis needs PR intervention",
+    "expansion_opportunity": "Identifying unserved market segments",
+    "defensive_maneuver": "Protecting market share against aggressive rivals",
+    "process_optimization": "Improving manufacturing efficiency",
+    "market_stagnation": "Steady state operations - no immediate threats"
+  },
+  "news": {
+    "investing_rd": "{{company}} is heavily investing in R&D to modernize its {{product}} line.",
+    "emergency_pr": "{{company}} has launched an emergency PR campaign to stabilize its image.",
+    "expanding_product": "{{company}} is expanding production of {{product}} due to {{reason}}.",
+    "defending_market": "{{company}} has initiated defensive pricing and marketing for {{product}}.",
+    "investing_process": "{{company}} is investing in process innovation to lower production costs.",
+    "bond_issuance_title": "Corporate Bond Issuance",
+    "bond_issuance_content": "{{company}} has issued corporate bonds worth {{amount}} to fund expansion.",
+    "smear_campaign_title": "Corporate Smear Campaign",
+    "smear_campaign_content": "A highly funded anonymous PR campaign has damaged the public image of {{target}}.",
+    "viral_marketing_title": "Viral Sensation!",
+    "viral_marketing_content": "{{company}}'s marketing for {{product}} has gone viral, boosting brand awareness!",
+    "price_war_title": "Aggressive Price War!",
+    "price_war_content": "{{company}} is aggressively undercutting prices on {{product}}!",
+    "executive_scandal_title": "Executive Scandal",
+    "executive_scandal_content": "A major scandal involving the leadership of {{company}} has caused investor panic.",
+    "gov_subsidy_title": "Government Subsidy",
+    "gov_subsidy_content": "The government has announced a major subsidy package for the {{sector}} sector.",
+    "natural_disaster_title": "Supply Chain Disruption",
+    "natural_disaster_content": "A natural disaster in {{city}} has caused significant delays in global logistics."
+  },
+  "notifications": {
+    "expanding_product": "AI Expanding: {{company}} is building new facilities for {{product}}. Reason: {{reason}}",
+    "investing_rd": "AI R&D: {{company}} is modernizing {{product}}.",
+    "emergency_pr": "AI Crisis: {{company}} launched emergency PR.",
+    "defending_market": "AI Defense: {{company}} is protecting its share in {{product}}.",
+    "investing_process": "AI Efficiency: {{company}} is investing in process innovation.",
+    "started_rd": "AI R&D: {{company}} started researching {{product}}.",
+    "price_war_msg": "Price War! {{company}} is slashing prices for {{product}}.",
+    "expanded_building": "AI Expansion: {{company}} expanded their {{building}} facility."
   },
   "categories": {
     "raw_materials": "Raw Materials",
@@ -154,7 +264,11 @@
     "efficiency": "Efficiency",
     "power": "Power",
     "pollution": "Pollution",
-    "inputs": "Inputs"
+    "inputs": "Inputs",
+    "gdp_growth": "GDP Growth",
+    "inflation": "Inflation",
+    "tax_rate": "Tax Rate",
+    "net_cash": "Net Cash"
   },
   "actions": {
     "build": "BUILD",
@@ -162,12 +276,59 @@
     "sell": "Sell",
     "×": "×",
     "pause": "Pause",
+    "resume": "Resume",
     "speed": "Speed"
   },
+  "ticker": {
+    "your_corp": "Your Corp",
+    "tech_giant": "Tech Giant",
+    "food_inc": "Food Inc.",
+    "auto_corp": "Auto Corp",
+    "global_bank": "Global Bank",
+    "oil_corp": "Oil Corp",
+    "pharma_co": "Pharma Co.",
+    "energy_ltd": "Energy Ltd."
+  },
+  "load_game": {
+    "title": "LOAD GAME",
+    "no_saves": "No saved games found",
+    "start_new_hint": "Start a new game to begin your empire!",
+    "confirm_delete": "Are you sure you want to delete save \"{{slot}}\"?",
+    "saved": "Saved",
+    "selected": "Selected",
+    "delete": "Delete save",
+    "loading": "Loading...",
+    "load_button": "Load Game"
+  },
   "months": {
-    "jan": "Jan", "feb": "Feb", "mar": "Mar", "apr": "Apr",
-    "may": "May", "jun": "Jun", "jul": "Jul", "aug": "Aug",
-    "sep": "Sep", "oct": "Oct", "nov": "Nov", "dec": "Dec"
+    "jan": "Jan",
+    "feb": "Feb",
+    "mar": "Mar",
+    "apr": "Apr",
+    "may": "May",
+    "jun": "Jun",
+    "jul": "Jul",
+    "aug": "Aug",
+    "sep": "Sep",
+    "oct": "Oct",
+    "nov": "Nov",
+    "dec": "Dec"
+  },
+  "system_menu": {
+    "title": "System Menu",
+    "save_game": "Save Game",
+    "load_game": "Load Game",
+    "github_help": "GitHub / Help",
+    "resume_game": "Resume Game",
+    "exit_to_menu": "Exit to Main Menu",
+    "back": "Back",
+    "new_save_name": "New save name...",
+    "save": "Save",
+    "no_saves": "No saves found",
+    "overwrite": "Overwrite",
+    "load_button": "Load",
+    "save_desc": "Save current progress",
+    "load_desc": "Load a previous save"
   },
   "products": {
     "Wheat": "Wheat",
@@ -204,7 +365,8 @@
     "Tablets": "Tablets",
     "Gaming Consoles": "Gaming Consoles",
     "Drones": "Drones",
-    "VR Headsets": "VR Headsets"
+    "VR Headsets": "VR Headsets",
+    "Process Innovation": "Process Innovation"
   },
   "buildings": {
     "all": "All",
@@ -286,40 +448,6 @@
     "Investment Bank": "Investment Bank",
     "Credit Union": "Credit Union"
   },
-  "ticker": {
-    "your_corp": "Your Corp",
-    "tech_giant": "Tech Giant",
-    "food_inc": "Food Inc.",
-    "auto_corp": "Auto Corp",
-    "global_bank": "Global Bank",
-    "oil_corp": "Oil Corp",
-    "pharma_co": "Pharma Co.",
-    "energy_ltd": "Energy Ltd."
-  },
-  "load_game": {
-    "title": "LOAD GAME",
-    "no_saves": "No saved games found",
-    "start_new_hint": "Start a new game to begin your empire!",
-    "confirm_delete": "Are you sure you want to delete save \"{{slot}}\"?",
-    "saved": "Saved",
-    "selected": "Selected",
-    "delete": "Delete save",
-    "loading": "Loading...",
-    "load_button": "Load Game"
-  },
-  "system_menu": {
-    "title": "SYSTEM MENU",
-    "save_game": "SAVE GAME",
-    "load_game": "LOAD GAME",
-    "github_help": "GITHUB / HELP",
-    "resume_game": "RESUME GAME",
-    "exit_to_menu": "EXIT TO MAIN MENU",
-    "back": "BACK",
-    "new_save_name": "New Save Name...",
-    "save": "SAVE",
-    "no_saves": "No saves found.",
-    "overwrite": "OVERWRITE"
-  },
   "scenario": {
     "select_title": "SELECT SCENARIO",
     "select_scenario": "Select a scenario to view details",
@@ -331,7 +459,19 @@
     "easy": "Easy",
     "medium": "Medium",
     "hard": "Hard",
-    "year": "Year"
+    "year": "Year",
+    "scenario_01": {
+      "title": "Industrial Revolution",
+      "description": "Start in the 1900s with basic technology and limited infrastructure. Labor is cheap, but efficiency is low. Can you build a manufacturing empire from scratch and shape the first global supply chains?"
+    },
+    "scenario_02": {
+      "title": "Tech Bubble",
+      "description": "It's the 90s. The internet is booming and venture capital is flowing freely. Navigate the volatile tech market, survive the impending dot-com crash, and emerge as a modern digital monopoly."
+    },
+    "scenario_03": {
+      "title": "Retail Apocalypse",
+      "description": "Traditional brick-and-mortar retail is dying as e-commerce takes over. You control a massive, struggling department store chain. Pivot your operations to digital sales and modern logistics before bankruptcy hits."
+    }
   },
   "settings": {
     "title": "Settings",
@@ -400,19 +540,27 @@
     "title": "WORLD MAP",
     "global_economy": "GLOBAL ECONOMY",
     "world_population": "WORLD POPULATION",
-    "avg_purchasing_power": "AVG PURCHASE POWER",
-    "consumer_sentiment": "CONS. SENTIMENT",
-    "unemployment": "Unemployment",
-    "interest_rate": "Interest Rate",
-    "inflation": "Inflation",
-    "tax_rate": "Tax Rate",
-    "gdp_growth": "GDP Growth",
-    "population": "Population",
-    "purchasing_power": "PP",
+    "million": "Million",
+    "pp": "Purchasing Power",
+    "avg_purchase_power": "Avg. Purchase Power",
+    "consumer_sentiment": "Consumer Sentiment",
     "economy_excellent": "Excellent",
     "economy_good": "Good",
     "economy_normal": "Normal",
     "economy_recession": "Recession"
+  },
+  "overlays": {
+    "title": "OVERLAYS",
+    "pollution": "Pollution",
+    "pollution_desc": "View city pollution levels",
+    "traffic": "Traffic",
+    "traffic_desc": "View traffic congestion",
+    "land_value": "Land Value",
+    "land_value_desc": "View real estate prices",
+    "sales_volume": "Sales Volume",
+    "sales_volume_desc": "View consumer activity",
+    "brand_power": "Brand Power",
+    "brand_power_desc": "View your brand presence"
   },
   "stock": {
     "exchange_title": "Stock Exchange",
@@ -519,10 +667,49 @@
     "campaign_coming_soon": "Campaign management coming soon!",
     "brand_power_rankings": "Brand Power Rankings",
     "competitor_details": "Competitor Details",
-    "share_trend": "Market Share Trend"
+    "share_trend": "Market Share Trend",
+    "power_legendary": "Legendary",
+    "power_strong": "Strong",
+    "power_moderate": "Moderate",
+    "power_weak": "Weak"
   },
   "common": {
     "cancel": "Cancel",
-    "×": "×"
+    "×": "×",
+    "select": "SELECT",
+    "link": "LINK"
+  },
+  "mainmenu": {
+    "new_game_desc": "Start a fresh corporate legacy",
+    "load_game_desc": "Return to your industrial empire",
+    "settings_desc": "Adjust simulation parameters",
+    "exit_desc": "Safe shutdown of all systems"
+  },
+  "sector": {
+    "technology": "Technology",
+    "consumer": "Consumer",
+    "industrial": "Industrial",
+    "finance": "Finance",
+    "energy": "Energy",
+    "conglomerate": "Conglomerate"
+  },
+  "management": {
+    "competitor_ranking": "COMPETITOR RANKING",
+    "rival_company": "Rival Company",
+    "personality_conservative": "CONSERVATIVE",
+    "personality_balanced": "BALANCED",
+    "personality_aggressive": "AGGRESSIVE"
+  },
+  "economy": {
+    "city_macro": "CITY MACRO DATA",
+    "city_subtitle": "Local economic indicators and demographics",
+    "city_population": "CITY POPULATION",
+    "purchasing_power": "PURCHASING POWER",
+    "consumer_sentiment": "CONSUMER SENTIMENT",
+    "avg_wage": "AVERAGE WAGE",
+    "fuel_price": "FUEL PRICE",
+    "inflation_rate": "INFLATION RATE",
+    "interest_rate": "INTEREST RATE",
+    "macro_trends": "MACRO TRENDS"
   }
 }

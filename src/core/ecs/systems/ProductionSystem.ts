@@ -1,5 +1,5 @@
 import { defineQuery } from 'bitecs'
-import { Building, ProductionOutput, Factory, Maintenance, Inventory, Company, CompanyTechnology } from '../components'
+import { Building, ProductionOutput, Factory, Maintenance, Inventory, Company } from '../components'
 import { GameWorld } from '../world'
 import { BuildingType } from '../../data/types'
 
@@ -16,22 +16,8 @@ export const productionSystem = (world: GameWorld) => {
   const productionQuery = defineQuery([Building, ProductionOutput, Company])
   const entities = productionQuery(world.ecsWorld)
 
-  // Cache tech lookups per company
-  const techCache = new Map<number, Map<number, number>>()
-
   const getTechLevel = (companyId: number, productId: number): number => {
-    if (!techCache.has(companyId)) {
-      const techMap = new Map<number, number>()
-      const techQuery = defineQuery([CompanyTechnology])
-      const techEntities = techQuery(world.ecsWorld)
-      for (const techId of techEntities) {
-        if (CompanyTechnology.companyId[techId] === companyId) {
-          techMap.set(CompanyTechnology.productId[techId], CompanyTechnology.techLevel[techId])
-        }
-      }
-      techCache.set(companyId, techMap)
-    }
-    return techCache.get(companyId)?.get(productId) || 40 // Default 40 if not found
+    return world.techLookup.get(companyId)?.get(productId) || 40
   }
   
   for (const id of entities) {
@@ -57,9 +43,22 @@ export const productionSystem = (world: GameWorld) => {
     if (isOperational) {
       const utilization = ProductionOutput.utilization[id] || 100
       // Apply HR efficiency multiplier: 100 efficiency = 1.0x, 0 = 0.5x, 200 = 1.5x
+      const companyId = Company.companyId[id]
+      const directive = Company.strategicDirective[companyId] || 0
+      const policies = Company.activePolicies[companyId] || 0
+      const hasAutomation = (policies & 2) === 2
+
       const efficiency = Factory.efficiency[id] || 100
-      const efficiencyMultiplier = 1 + (efficiency - 100) / 200
+      let efficiencyMultiplier = 1 + (efficiency - 100) / 200
+      
+      if (hasAutomation) {
+         efficiencyMultiplier *= 1.20 // 20% output boost due to systematic automation
+      }
       let potentialOutput = Math.floor(capacity * (utilization / 100) * efficiencyMultiplier)
+      
+      if (directive === 1) { // Quality Leadership
+        potentialOutput = Math.floor(potentialOutput * 0.85) // 15% reduction for higher precision
+      }
 
     if (buildingData.type === BuildingType.FARM || buildingData.type === BuildingType.MINE) {
       // Extraction buildings produce without inputs (simplified for now)
@@ -125,6 +124,12 @@ export const productionSystem = (world: GameWorld) => {
           // Quality formula: blend of input quality and tech level
           // Higher tech = ability to produce better quality from same inputs
           let finalQuality = Math.floor((avgInputQuality * 0.6) + (normalizedTech * 0.4))
+
+          // --- STRATEGIC DIRECTIVE EFFECTS (Quality) ---
+          const directive = Company.strategicDirective[companyId] || 0
+          if (directive === 1) finalQuality += 10 // Quality Leadership
+          if (directive === 3) finalQuality -= 10 // Lean Operations (Cheaply made)
+
           finalQuality = Math.min(100, Math.max(1, finalQuality))
 
           // 4. Produce output

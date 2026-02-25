@@ -101,6 +101,12 @@ export function parseProducts(content: string): ParseResult<ProductData> {
       const perishableStr = row[headers.get('perishable')!]?.toLowerCase()
       const qualitySensitiveStr = row[headers.get('qualitysensitive')!]?.toLowerCase()
       
+      // Extended attributes (optional in file, but required in interface)
+      const techLevel = parseInt(row[headers.get('techlevel')!] || '1', 10)
+      const expertiseRequired = parseInt(row[headers.get('expertiserequired')!] || '0', 10)
+      const knowledgePoints = parseInt(row[headers.get('knowledgepoints')!] || '0', 10)
+      const innovationRate = parseFloat(row[headers.get('innovationrate')!] || '0.0')
+
       // Validate category
       if (!Object.values(ProductCategory).includes(categoryStr as ProductCategory)) {
         errors.push(`Line ${lineNum}: Invalid category "${categoryStr}"`)
@@ -116,6 +122,10 @@ export function parseProducts(content: string): ParseResult<ProductData> {
         unitWeight,
         perishable: perishableStr === 'true',
         qualitySensitive: qualitySensitiveStr === 'true',
+        techLevel,
+        expertiseRequired,
+        knowledgePoints,
+        innovationRate,
       }
       
       products.push(product)

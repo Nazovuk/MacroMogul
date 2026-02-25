@@ -14,13 +14,15 @@
 .financial-dashboard{
   width: min(1100px, calc(100vw - 32px));
   height: min(760px, calc(100vh - 120px));
-  background: rgba(18, 22, 34, 0.92);
-  border: 1px solid rgba(255,255,255,0.10);
-  border-radius: 16px;
-  box-shadow: 0 24px 70px rgba(0,0,0,0.55);
+  background: rgba(15, 23, 42, 0.95);
+  backdrop-filter: blur(28px);
+  -webkit-backdrop-filter: blur(28px);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 20px;
+  box-shadow: 0 30px 90px rgba(0, 0, 0, 0.6);
   overflow: hidden;
-  display:flex;
-  flex-direction:column;
+  display: flex;
+  flex-direction: column;
 }
 
 .dashboard-header{
@@ -84,14 +86,23 @@
   margin-bottom: 14px;
 }
 .finance-card{
-  background: rgba(255,255,255,0.03);
-  border: 1px solid rgba(255,255,255,0.06);
-  border-radius: 14px;
-  padding: 12px;
+  background: rgba(30, 41, 59, 0.5);
+  backdrop-filter: blur(8px);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 16px;
+  padding: 20px;
+  transition: all 0.2s ease;
 }
+
+.finance-card:hover {
+  background: rgba(30, 41, 59, 0.7);
+  border-color: rgba(255, 255, 255, 0.15);
+  transform: translateY(-2px);
+}
+
 .finance-card.primary{
-  border-color: rgba(0,217,165,0.28);
-  background: rgba(0,217,165,0.06);
+  border-color: rgba(0,217,165,0.3);
+  background: rgba(0, 217, 165, 0.08);
 }
 .card-label{
   display:block;
@@ -109,6 +120,120 @@
 .card-value.positive{ color: rgba(0,217,165,0.95); }
 .card-value.negative{ color: rgba(255,71,87,0.95); }
 
+/* --- CASHFLOW STATEMENT (P&L) --- */
+.cashflow-tab {
+  padding: 10px;
+  max-width: 800px;
+  margin: 0 auto;
+}
+
+.cashflow-header {
+  margin-bottom: 24px;
+  text-align: center;
+}
+
+.cashflow-header h3 {
+  font-family: 'Outfit', sans-serif;
+  font-size: 22px;
+  font-weight: 700;
+  color: #fff;
+  margin: 0 0 5px 0;
+  letter-spacing: 0.05em;
+}
+
+.cashflow-header p {
+  font-size: 13px;
+  color: rgba(255, 255, 255, 0.5);
+  margin: 0;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+}
+
+.cashflow-statement {
+  background: rgba(15, 23, 42, 0.4);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 16px;
+  padding: 30px 40px;
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.3);
+}
+
+.cf-section-title {
+  font-size: 11px;
+  font-weight: 800;
+  color: #70a1ff;
+  text-transform: uppercase;
+  letter-spacing: 0.15em;
+  margin-bottom: 15px;
+  margin-top: 10px;
+}
+
+.cf-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 12px 0;
+  color: #e2e8f0;
+  font-size: 15px;
+  transition: background 0.2s;
+}
+
+.cf-row:hover {
+  background: rgba(255, 255, 255, 0.02);
+  border-radius: 6px;
+  padding: 12px 10px;
+  margin: 0 -10px;
+}
+
+.cf-row.op-expense span:first-child {
+  color: rgba(255, 255, 255, 0.65);
+  padding-left: 15px; /* Indent sub-items */
+  position: relative;
+}
+
+.cf-row.op-expense span:first-child::before {
+  content: '└';
+  position: absolute;
+  left: 0;
+  top: 0;
+  color: rgba(255, 255, 255, 0.2);
+}
+
+.cf-divider {
+  height: 1px;
+  background: rgba(255, 255, 255, 0.1);
+  margin: 15px 0;
+}
+
+.cf-divider.bold {
+  height: 2px;
+  background: rgba(255, 255, 255, 0.2);
+  margin: 20px 0;
+}
+
+.cf-total-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 15px 0;
+  color: #fff;
+  font-size: 15px;
+  font-weight: 600;
+}
+
+.final-net {
+  font-size: 18px;
+  font-weight: 800;
+  color: #fff;
+  background: rgba(255, 255, 255, 0.03);
+  padding: 20px !important;
+  margin: 0 -20px !important;
+  border-radius: 12px;
+}
+
+.final-net span.positive { color: #10b981; }
+.final-net span.negative { color: #ef4444; }
+
 @media (max-width: 980px){
   .finance-cards{ grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .cashflow-statement { padding: 20px; }
 }

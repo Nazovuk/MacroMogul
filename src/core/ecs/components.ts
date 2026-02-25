@@ -122,9 +122,11 @@ export const TechAge = defineComponent({
   maxLevel: Types.ui8,         // Cap based on era
   obsolescenceRate: Types.ui8, // 0-100
   innovationPoints: Types.ui32,
+  globalInnovationSpeed: Types.f32,
 })
 
 export const ProductTech = defineComponent({
+  productId: Types.ui16,
   techLevelRequired: Types.ui8,
   complexity: Types.ui8,
   maintainanceHours: Types.ui16,
@@ -233,7 +235,14 @@ export const HumanResources = defineComponent({
   morale: Types.ui8,         // 0-100
   trainingLevel: Types.ui8,  // 0-100
   salary: Types.f64,        // Average monthly salary per head
+  benefits: Types.f64,      // Monthly benefit spend per head (health, pension, etc)
   trainingBudget: Types.f64, // Monthly training spend
+})
+
+export const Strike = defineComponent({
+  durationDays: Types.ui8,
+  startTick: Types.ui32,
+  severity: Types.ui8, // 0=None, 1=High, 2=Critical
 })
 
 // ============================================================================
@@ -247,6 +256,40 @@ export const Finances = defineComponent({
   interestRate: Types.ui16, // Basis points (e.g., 500 = 5%)
   creditRating: Types.ui8,  // 0-100
 })
+
+// Loan structure for tracking individual loans
+export interface Loan {
+  id: number;
+  principal: number;        // Original loan amount
+  remaining: number;        // Remaining balance
+  interestRate: number;     // Annual interest rate in basis points
+  monthlyPayment: number;   // Fixed monthly payment
+  monthsRemaining: number;  // Months left to pay
+  startTick: number;        // When loan was issued
+}
+
+// Bond structure for corporate bonds
+export interface CorporateBond {
+  id: number;
+  faceValue: number;        // Bond face value (cents)
+  couponRate: number;       // Annual coupon rate in basis points
+  issuePrice: number;       // Price bond was issued at
+  maturityMonths: number;   // Total months to maturity
+  monthsRemaining: number;  // Months left
+  startTick: number;
+  bondRating: 'AAA' | 'AA' | 'A' | 'BBB' | 'BB' | 'B' | 'CCC' | 'D';
+}
+
+// Extended financial tracking (stored separately from ECS due to complexity)
+export interface CompanyFinancials {
+  companyId: number;
+  loans: Loan[];
+  bonds: CorporateBond[];
+  lastMonthInterestPaid: number;
+  lastMonthPrincipalPaid: number;
+  lastMonthCouponPaid: number;
+  totalInterestPaidYTD: number;
+}
 
 export const Stock = defineComponent({
   sharesOutstanding: Types.f64,
@@ -271,6 +314,10 @@ export const Company = defineComponent({
   revenueLastMonth: Types.f64,
   expensesLastMonth: Types.f64,
   netIncomeLastMonth: Types.f64,
+  currentMonthRevenue: Types.f64,
+  currentMonthExpenses: Types.f64,
+  strategicDirective: Types.ui8, // 0=None, 1=Quality, 2=Aggression, 3=Efficiency
+  activePolicies: Types.ui8, // Bitmask: 1=Training, 2=Automation, 4=Benefits
 })
 
 // ============================================================================
@@ -330,6 +377,7 @@ export const LogisticSupply = defineComponent({
  * MarketData tracks the global standing of a product within the simulation.
  */
 export const MarketData = defineComponent({
+  productId: Types.ui16,
   price: Types.f64,          // Current selling price (cents)
   quality: Types.ui8,         // 0-100: Impacted by Tech and Factory efficiency
   brandPower: Types.ui8,      // 0-100: Impacted by marketing

@@ -25,10 +25,10 @@
 /* Scene Layer 4: HUD / Dashboard Overlay */
 .dashboard-overlay {
   position: absolute;
-  top: 100px;
+  top: 180px;
   left: 24px;
   right: 24px;
-  bottom: 100px;
+  bottom: 90px;
   z-index: 100;
   pointer-events: auto;
 }
@@ -64,7 +64,7 @@
 /* Build Preview Bar */
 .build-preview-bar {
   position: absolute;
-  top: 160px;
+  top: 180px;
   left: 50%;
   transform: translateX(-50%);
   background: rgba(15, 23, 42, 0.85);
@@ -133,4 +133,51 @@
 .view-btn.active {
   background: #e94560;
   box-shadow: 0 0 20px rgba(233, 69, 96, 0.5);
+}
+
+/* Global Premium Icon Button (as requested for width: 36px; height: 36px; display: flex;) */
+.premium-icon-btn {
+  width: 36px;
+  height: 36px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 10px;
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  color: white;
+  cursor: pointer;
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  position: relative;
+  overflow: hidden;
+  flex-shrink: 0;
+}
+
+.premium-icon-btn:hover {
+  background: rgba(255, 255, 255, 0.12);
+  border-color: rgba(255, 255, 255, 0.2);
+  transform: translateY(-2px);
+  box-shadow: 0 10px 20px rgba(0, 0, 0, 0.3);
+}
+
+.premium-icon-btn:active {
+  transform: translateY(0) scale(0.95);
+}
+
+.premium-icon-btn .btn-glow {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: 100%;
+  height: 100%;
+  background: radial-gradient(circle, var(--btn-color, #70a1ff) 0%, transparent 70%);
+  transform: translate(-50%, -50%) scale(0);
+  opacity: 0;
+  pointer-events: none;
+  transition: all 0.4s ease;
+}
+
+.premium-icon-btn:hover .btn-glow {
+  transform: translate(-50%, -50%) scale(1.5);
+  opacity: 0.2;
 }

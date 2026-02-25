@@ -18,13 +18,17 @@ import {
   Renderable,
   Isometric,
   Building as BuildingComponent,
+  EntityType,
+  EntityKind,
 } from '../../core/ecs/components'
+import { Text, TextStyle } from 'pixi.js'
 import { TextureManager } from '../TextureManager'
 import { getTileFromNoise, fbm, hash, TILE_WIDTH, TILE_HEIGHT, TILE_DEPTH } from '@/rendering/utils'
 import type { TileType } from '@/rendering/utils'
 // DataStore removed
 import type { GameDataStore } from '../../core/data/types'
 import { LogisticSupply } from '../../core/ecs/components'
+import { CITIES } from '../../core/data/cities'
 
 export type { TileType }
 
@@ -260,7 +264,6 @@ export class RenderingSystem {
    */
   private resolveBuildingCategory(entityId: number): string {
     if (!hasComponent(this.world, BuildingComponent, entityId)) {
-      // If it's not a building component, try to see if it's a generic renderable or fallback
       return 'OFFICE'
     }
 
@@ -268,15 +271,66 @@ export class RenderingSystem {
     if (this.dataStore) {
       const bd = this.dataStore.getBuilding(typeId)
       if (bd) {
-        // Precise mapping from DataStore to visual type
-        // The DataStore BuildingType enum matches our VisualBuildingCategory strings
         return bd.type
       }
     }
 
-    // Fallback if data store is missing or building not found
-    console.warn(`[RenderingSystem] Entity ${entityId} → typeId ${typeId} fallback to OFFICE`)
     return 'OFFICE'
+  }
+
+  /**
+   * Cities are rendered as clusters of buildings or special skyscrapers.
+   */
+  private syncCity(entityId: number) {
+    if (!hasComponent(this.world, Position, entityId)) return
+
+    let visual = this.visuals.get(entityId)
+    if (!visual) {
+      const container = new Container()
+      
+      // City buildings cluster
+      // Render one large building and potentially some smaller ones around it
+      const texture = TextureManager.getBuildingTexture('OFFICE')
+      if (texture) {
+        const sprite = new Sprite(texture)
+        sprite.anchor.set(0.5, 0.95)
+        sprite.scale.set(1.4)
+        container.addChild(sprite)
+      }
+
+      // Add City Name Label
+      const cityIdx = Position.cityId[entityId] - 1
+      const cityData = CITIES[cityIdx]
+      const cityName = cityData ? cityData.name : `City ${Position.cityId[entityId]}`
+      
+      const style = new TextStyle({
+        fontFamily: 'Outfit, Inter, sans-serif',
+        fontSize: 16,
+        fontWeight: 'bold',
+        fill: '#ffffff',
+        stroke: '#000000',
+        strokeThickness: 4,
+        dropShadow: true,
+        dropShadowBlur: 5,
+        dropShadowColor: '#000000',
+        dropShadowDistance: 3,
+        letterSpacing: 2,
+      } as any)
+      
+      const label = new Text({ text: cityName.toUpperCase(), style })
+      label.anchor.set(0.5, 3.8) // Higher above the "main" building
+      container.addChild(label)
+
+      this.entityLayer.addChild(container)
+      visual = { entityId, sprite: container, screenX: 0, screenY: 0, buildingCategory: 'CITY' }
+      this.visuals.set(entityId, visual)
+    }
+
+    const mx = Position.x[entityId]
+    const my = Position.y[entityId]
+    const screen = this.mapToScreen(mx, my)
+    visual.sprite.position.set(screen.x, screen.y)
+    visual.sprite.zIndex = mx + my + 500 // Cities are visually prioritized
   }
 
   public update(_dt: number): number[] {
@@ -293,7 +347,12 @@ export class RenderingSystem {
 
     // Sync active entities
     for (const id of entities) {
-      this.syncEntity(id)
+      const kind = EntityType.kind[id]
+      if (kind === EntityKind.City) {
+        this.syncCity(id)
+      } else {
+        this.syncEntity(id)
+      }
     }
 
     if (this.activeOverlay === 'logistics') {

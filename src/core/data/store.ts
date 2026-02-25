@@ -222,6 +222,7 @@ class DataStore implements GameDataStore {
       [ProductCategory.DIGITAL]: [BuildingType.OFFICE],
       [ProductCategory.FINANCIAL]: [BuildingType.BANK],
       [ProductCategory.GREEN]: [BuildingType.FACTORY],
+      [ProductCategory.INTERNAL]: [BuildingType.OFFICE],
     }
     
     const buildingTypes = categoryToBuilding[product.category]

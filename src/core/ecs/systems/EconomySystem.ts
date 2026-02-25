@@ -11,7 +11,10 @@ import { ProductCategory } from '../../data/types'
  */
 import { ProductionOutput } from '../components'
 
+const TICKS_PER_MONTH = 900 // 30 days * 30 ticks
+
 export const economySystem = (world: GameWorld) => {
+  const isNewMonth = world.tick % TICKS_PER_MONTH === 0
   const buildingQuery = defineQuery([Building, MarketData, Inventory, ProductionOutput, Company])
   const entities = buildingQuery(world.ecsWorld)
 
@@ -109,13 +112,12 @@ export const economySystem = (world: GameWorld) => {
     // For now, we use it to represent how much of the potential demand is met.
     MarketData.marketShare[id] = share
 
-    // Sync market share back to ProductBrand entity (for UI and MarketingSystem feedback)
+    // Sync market share back to ProductBrand entity
     const compIdForBrand = Company.companyId[id]
     const brandQuerySync = defineQuery([ProductBrand])
     const allBrands = brandQuerySync(world.ecsWorld)
     for (const bid of allBrands) {
-      if (ProductBrand.companyId[bid] === compIdForBrand && ProductBrand.productId[bid] === prodId) {
-        // Use max of building-level shares for this company+product
+      if (ProductBrand.productId[bid] === prodId && ProductBrand.companyId[bid] === compIdForBrand) {
         if (share > (ProductBrand.marketShare[bid] || 0)) {
           ProductBrand.marketShare[bid] = share
         }
@@ -124,5 +126,54 @@ export const economySystem = (world: GameWorld) => {
     }
   }
 
+  // ─── 3. MACRO-ECONOMIC UPDATE (Monthly) ───
+  if (isNewMonth) {
+    updateCityMacroEconomy(cityEntities);
+  }
+
   return world
+}
+
+/**
+ * Simulates Central Bank and Inflation logic.
+ * Inflation rises if market saturation is low (excess demand).
+ * Interest rates rise to combat high inflation.
+ */
+function updateCityMacroEconomy(cityEntities: number[]) {
+  for (const cid of cityEntities) {
+    // In a real system, we'd loop through city-specific demand. 
+    // Here we use a global pressure metric.
+    const inflationPressure = (Math.random() - 0.4) * 50; // -20 to +30 bps drift
+    
+    let currentInflation = CityEconomicData.inflationRate[cid];
+    let currentInterest = CityEconomicData.interestRate[cid];
+    
+    // 1. Inflation Logic: Drifts towards pressure, plus a random walk
+    currentInflation = Math.max(-200, Math.min(1500, currentInflation + inflationPressure)); 
+    CityEconomicData.inflationRate[cid] = currentInflation;
+    
+    // 2. Central Bank Logic: Interest rates lag inflation
+    // Target real rate = 2% (200 bps) + Inflation
+    const targetInterest = currentInflation + 200;
+    
+    // Smooth adjustment: 10% towards target per month
+    const adjustment = Math.floor((targetInterest - currentInterest) * 0.1);
+    CityEconomicData.interestRate[cid] = Math.max(100, currentInterest + adjustment);
+    
+    if (Math.abs(adjustment) > 50) {
+       console.log(`[Macro] City ${cid} Central Bank ${adjustment > 0 ? 'Hiked' : 'Cut'} rates by ${Math.abs(adjustment)}bps. Current: ${(CityEconomicData.interestRate[cid]/100).toFixed(2)}%`);
+       
+       if (cid === cityEntities[0]) {
+         notifyUI(`Central Bank adjusted interest rates to ${(CityEconomicData.interestRate[cid]/100).toFixed(2)}%`, adjustment > 0 ? 'warning' : 'info');
+       }
+    }
+  }
+}
+
+function notifyUI(message: string, type: 'info' | 'warning' | 'danger' = 'info') {
+    if (typeof window !== 'undefined') {
+        window.dispatchEvent(new CustomEvent('game-notification', { 
+            detail: { message, type, timestamp: Date.now() } 
+        }));
+    }
 }

@@ -1,24 +1,20 @@
-PROJECT: MacroMogul (AAA Strategy Simulation Game)
+# MacroMogul Continuity Guide (Handoff)
 
-UI DESIGN STANDARD:
-- Premium glassmorphism
-- Paradox/Frostpunk style HUD
-- Animated glow buttons
-- High-end strategy game interface (NOT minimal UI)
-- TopBar is CORE HUD element, must be visually rich
+## Current Stable State
+- **Game Loop**: FIXED. `App.tsx` now correctly initializes ECS world and transitions to `playing`.
+- **UI**: TopBar restored with Market, Finance, and Stocks triggers. Glass UI styles are active.
+- **Build**: Passing. (Lint errors in `MainMenu` and `App` related to `onLoadGame` were fixed surgically).
 
-TOPBAR REQUIREMENTS:
-- Glass background
-- Soft glow borders
-- Active state highlight
-- Hover animations
-- AAA polished look (NOT basic buttons)
+## Strategic Backlog (Critical Agent Tasks)
+1. **ECS Market Simulation**: Real competitors need to react to player pricing.
+2. **Financial Systems**: Implement the backend logic for interest-bearing loans and bond issuance in `financialSystem.ts`.
+3. **Save/Load Integrity**: Verify all ECS components (especially `CityEconomicData`) are correctly serialized.
 
-DO NOT:
-- Replace with generic buttons
-- Simplify UI components
-- Remove animations
-- Downgrade visual hierarchy
+## Opencode Backlog (Tactical Tasks)
+1. **UI Polish**: Enhance glassmorphism in `Dashboard.css` and `MainMenu.css`.
+2. **Copywriting**: Expand i18n keys for scenario descriptions and event notifications.
+3. **Styling**: Standardize button hover effects across all sub-panels.
 
-AGENT RULE:
-UI quality > simplicity
+## Next Steps for AI Agent
+1. Read `handoff_state.md` artifact.
+2. Continue with Phase 4 in `task.md`.

@@ -29,7 +29,7 @@ interface MarketDashboardProps {
 // Sparkline component for awareness trends
 function Sparkline({ value, color = '#00d9a5' }: { value: number; color?: string }) {
   // Generate a simple sparkline path based on value
-  const points = [];
+  const points: string[] = [];
   const segments = 10;
   for (let i = 0; i <= segments; i++) {
     const x = (i / segments) * 60;
@@ -55,11 +55,13 @@ function Sparkline({ value, color = '#00d9a5' }: { value: number; color?: string
 function MarketShareBar({ 
   playerShare, 
   competitorShare, 
-  total 
+  total,
+  t
 }: { 
   playerShare: number; 
   competitorShare: number;
   total: number;
+  t: any;
 }) {
   const playerPercent = total > 0 ? (playerShare / total) * 100 : 0;
   const competitorPercent = total > 0 ? (competitorShare / total) * 100 : 0;
@@ -70,12 +72,12 @@ function MarketShareBar({
         <div 
           className="share-fill player"
           style={{ width: `${playerPercent}%` }}
-          title={`Your Share: ${playerPercent.toFixed(1)}%`}
+          title={`${t('market.your_share')}: ${playerPercent.toFixed(1)}%`}
         />
         <div 
           className="share-fill competitor"
           style={{ width: `${competitorPercent}%`, left: `${playerPercent}%` }}
-          title={`Competitors: ${competitorPercent.toFixed(1)}%`}
+          title={`${t('market.competitors')}: ${competitorPercent.toFixed(1)}%`}
         />
       </div>
       <div className="share-labels">
@@ -96,7 +98,7 @@ function MarketShareMiniChart({
 }) {
   // Generate mock historical data based on current values
   const data = useMemo(() => {
-    const points = [];
+    const points: { tick: number; you: number; competitors: number }[] = [];
     for (let i = 0; i <= 6; i++) {
       // Simulate some fluctuation
       const fluctuation = Math.sin(i * 0.8) * 5;
@@ -160,27 +162,29 @@ function MarketShareMiniChart({
 function BrandPowerCard({ 
   companyId,
   brandPower,
-  rank 
+  rank,
+  t
 }: { 
   companyId: number;
   brandPower: number;
   rank: number;
+  t: any;
 }) {
   const getPowerLevel = (power: number) => {
-    if (power >= 80) return { label: 'Legendary', color: '#fbbf24', icon: '👑' };
-    if (power >= 60) return { label: 'Strong', color: '#00d9a5', icon: '💪' };
-    if (power >= 40) return { label: 'Moderate', color: '#3b82f6', icon: '📈' };
-    return { label: 'Weak', color: '#ef4444', icon: '📉' };
+    if (power >= 80) return { label: t('market.power_legendary'), color: '#fbbf24', icon: '👑' };
+    if (power >= 60) return { label: t('market.power_strong'), color: '#00d9a5', icon: '💪' };
+    if (power >= 40) return { label: t('market.power_moderate'), color: '#3b82f6', icon: '📈' };
+    return { label: t('market.power_weak'), color: '#ef4444', icon: '📉' };
   };
   
   const powerInfo = getPowerLevel(brandPower);
   
   return (
     <div className="brand-power-card">
-      <div className="brand-rank">#{rank}</div>
+      <div className="premium-icon-btn brand-rank" style={{ pointerEvents: 'none' }}>#{rank}</div>
       <div className="brand-info">
         <span className="brand-icon">{powerInfo.icon}</span>
-        <span className="brand-name">{companyId === 1 ? 'Your Company' : `Competitor ${companyId}`}</span>
+        <span className="brand-name">{companyId === 1 ? t('market.your_company') : `${t('market.competitor')} ${companyId}`}</span>
       </div>
       <div className="brand-metrics">
         <div className="brand-power-bar">
@@ -447,7 +451,14 @@ export function MarketDashboard({ world, onClose }: MarketDashboardProps) {
       <div className="market-dashboard">
         <div className="dashboard-header">
           <h2>📊 {t('market.title')}</h2>
-          <button className="close-btn" onClick={onClose}>×</button>
+          <button 
+            className="premium-icon-btn" 
+            onClick={onClose}
+            style={{ '--btn-color': '#ef4444' } as React.CSSProperties}
+          >
+            ✕
+            <div className="btn-glow"></div>
+          </button>
         </div>
 
         <div className="dashboard-tabs">
@@ -527,11 +538,12 @@ export function MarketDashboard({ world, onClose }: MarketDashboardProps) {
                     .slice(0, 5)
                     .map(product => (
                       <div key={product.id} className="comparison-row">
-                        <span className="product-name">{product.name}</span>
+                        <span className="product-name">{t(`products.${product.name}`, { defaultValue: product.name })}</span>
                         <MarketShareBar
                           playerShare={product.playerBrand?.marketShare || 0}
                           competitorShare={product.totalMarketShare - (product.playerBrand?.marketShare || 0)}
                           total={product.totalMarketShare}
+                          t={t}
                         />
                       </div>
                     ))}
@@ -544,7 +556,7 @@ export function MarketDashboard({ world, onClose }: MarketDashboardProps) {
             <div className="competitors-tab">
               {/* Brand Power Rankings */}
               <div className="section">
-                <h3>⚡ {t('market.brand_power_rankings') || 'Brand Power Rankings'}</h3>
+                <h3>⚡ {t('market.brand_power_rankings')}</h3>
                 <div className="brand-power-list">
                   {marketData.companies
                     .sort((a, b) => (b.avgAwareness + b.avgLoyalty) - (a.avgAwareness + a.avgLoyalty))
@@ -554,6 +566,7 @@ export function MarketDashboard({ world, onClose }: MarketDashboardProps) {
                         companyId={company.id}
                         brandPower={(company.avgAwareness + company.avgLoyalty) / 2}
                         rank={index + 1}
+                        t={t}
                       />
                     ))}
                 </div>
@@ -561,7 +574,7 @@ export function MarketDashboard({ world, onClose }: MarketDashboardProps) {
 
               {/* Competitor Details */}
               <div className="section">
-                <h3>🏢 {t('market.competitor_details') || 'Competitor Details'}</h3>
+                <h3>🏢 {t('market.competitor_details')}</h3>
                 <div className="competitor-list">
                   {competitors.map(company => (
                     <div key={company.id} className="competitor-card">
@@ -579,19 +592,19 @@ export function MarketDashboard({ world, onClose }: MarketDashboardProps) {
                       </div>
                       <div className="competitor-stats">
                         <div className="stat">
-                          <span className="label">{t('market.buildings')}</span>
+                          <span className="label">{t('stats.buildings')}</span>
                           <span className="value">{company.buildingCount}</span>
                         </div>
                         <div className="stat">
-                          <span className="label">{t('market.retail')}</span>
+                          <span className="label">{t('stats.retail')}</span>
                           <span className="value">{company.retailCount}</span>
                         </div>
                         <div className="stat">
-                          <span className="label">{t('market.factories')}</span>
+                          <span className="label">{t('stats.factories')}</span>
                           <span className="value">{company.factoryCount}</span>
                         </div>
                         <div className="stat">
-                          <span className="label">{t('market.inventory')}</span>
+                          <span className="label">{t('stats.inventory')}</span>
                           <span className="value">{company.totalInventory.toLocaleString()}</span>
                         </div>
                         <div className="stat">
@@ -637,7 +650,7 @@ export function MarketDashboard({ world, onClose }: MarketDashboardProps) {
                     >
                       <div className="product-header">
                         <div className="product-title-row">
-                          <h4>{product.name}</h4>
+                          <h4>{t(`products.${product.name}`, { defaultValue: product.name })}</h4>
                           {product.playerBrand && (
                             <span 
                               className="market-share-badge"
@@ -681,7 +694,7 @@ export function MarketDashboard({ world, onClose }: MarketDashboardProps) {
                             </div>
                           </div>
                           <div className="market-share-chart-section">
-                            <span className="chart-label">{t('market.share_trend') || 'Market Share Trend'}</span>
+                            <span className="chart-label">{t('market.share_trend')}</span>
                             <MarketShareMiniChart 
                               currentShare={product.playerBrand.marketShare}
                               competitorShare={product.totalMarketShare - product.playerBrand.marketShare}
@@ -756,7 +769,14 @@ export function MarketDashboard({ world, onClose }: MarketDashboardProps) {
           <div className="campaign-modal" onClick={e => e.stopPropagation()}>
             <div className="modal-header">
               <h3>{t('market.campaign_title')}</h3>
-              <button className="close-btn" onClick={() => setShowCampaignModal(false)}>×</button>
+              <button 
+                className="premium-icon-btn" 
+                onClick={() => setShowCampaignModal(false)}
+                style={{ '--btn-color': '#94a3b8' } as React.CSSProperties}
+              >
+                ✕
+                <div className="btn-glow"></div>
+              </button>
             </div>
             <div className="modal-content">
               <div className="campaign-icon">📢</div>

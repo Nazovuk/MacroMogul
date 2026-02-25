@@ -28,24 +28,24 @@ const TYPE_ICONS: Record<string, string> = {
   BANK: '🏦',
 }
 
-// Category order + labels
-const CATEGORIES: { id: string; label: string; icon: string }[] = [
-  { id: 'all',           label: 'All',           icon: '📋' },
-  { id: 'RESIDENTIAL',   label: 'Residential',   icon: '🏠' },
-  { id: 'RETAIL',        label: 'Retail',        icon: '🛒' },
-  { id: 'SUPERMARKET',   label: 'Supermarket',   icon: '🛍️' },
-  { id: 'RESTAURANT',    label: 'Restaurant',    icon: '🍽️' },
-  { id: 'FACTORY',       label: 'Factory',       icon: '🏭' },
-  { id: 'FARM',          label: 'Farm',          icon: '🚜' },
-  { id: 'MINE',          label: 'Mine',          icon: '⛏️' },
-  { id: 'WAREHOUSE',     label: 'Warehouse',     icon: '📦' },
-  { id: 'OFFICE',        label: 'Office',        icon: '🏙️' },
-  { id: 'HOSPITAL',      label: 'Hospital',      icon: '🏥' },
-  { id: 'GYM',           label: 'Gym',           icon: '💪' },
-  { id: 'CINEMA',        label: 'Cinema',        icon: '🎬' },
-  { id: 'KINDERGARTEN',  label: 'Kindergarten',  icon: '👶' },
-  { id: 'HOTEL',         label: 'Hotel',         icon: '🏨' },
-  { id: 'BANK',          label: 'Bank',          icon: '🏦' },
+// Category order - labels will be translated dynamically
+const CATEGORIES: { id: string; icon: string }[] = [
+  { id: 'all',           icon: '📋' },
+  { id: 'RESIDENTIAL',   icon: '🏠' },
+  { id: 'RETAIL',        icon: '🛒' },
+  { id: 'SUPERMARKET',   icon: '🛍️' },
+  { id: 'RESTAURANT',    icon: '🍽️' },
+  { id: 'FACTORY',       icon: '🏭' },
+  { id: 'FARM',          icon: '🚜' },
+  { id: 'MINE',          icon: '⛏️' },
+  { id: 'WAREHOUSE',     icon: '📦' },
+  { id: 'OFFICE',        icon: '🏙️' },
+  { id: 'HOSPITAL',      icon: '🏥' },
+  { id: 'GYM',           icon: '💪' },
+  { id: 'CINEMA',        icon: '🎬' },
+  { id: 'KINDERGARTEN',  icon: '👶' },
+  { id: 'HOTEL',         icon: '🏨' },
+  { id: 'BANK',          icon: '🏦' },
 ]
 
 export function BuildMenu({ buildings, onSelectBuilding, onClose }: BuildMenuProps) {
@@ -71,14 +71,14 @@ export function BuildMenu({ buildings, onSelectBuilding, onClose }: BuildMenuPro
         <div className="build-menu-header">
           <div className="header-title">
             <span className="header-icon">🏗️</span>
-            <h2>{t('menu.build_desc') || 'CONSTRUCTION CENTER'}</h2>
+            <h2>{t('menu.build_desc')}</h2>
           </div>
 
           <div className="header-search">
             <span className="search-icon">🔍</span>
             <input 
               type="text" 
-              placeholder="Search buildings..." 
+              placeholder={t('buildmenu.search_placeholder')} 
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
               className="search-input"
@@ -96,7 +96,7 @@ export function BuildMenu({ buildings, onSelectBuilding, onClose }: BuildMenuPro
                 onClick={() => setActiveCategory(cat.id)}
               >
                 <span className="cat-icon">{cat.icon}</span>
-                <span className="cat-label">{cat.label}</span>
+                <span className="cat-label">{cat.id === 'all' ? t('buildings.all') : t(`buildmenu.type_${cat.id.toLowerCase()}`)}</span>
               </button>
             ))}
           </aside>
@@ -116,7 +116,7 @@ export function BuildMenu({ buildings, onSelectBuilding, onClose }: BuildMenuPro
                     </span>
                   </div>
                   <div className="building-info">
-                    <h3 className="building-name">{t(`buildings.${building.name}`) || building.name}</h3>
+                    <h3 className="building-name">{t(`buildings.${building.name}`, { defaultValue: building.name })}</h3>
                     <div className="building-stats">
                       <div className="stat-row">
                         <span>💰 {t('stats.cost')}</span>
@@ -124,7 +124,7 @@ export function BuildMenu({ buildings, onSelectBuilding, onClose }: BuildMenuPro
                       </div>
                       <div className="stat-row">
                         <span>⏱️ {t('stats.build_time')}</span>
-                        <span className="stat-value">{building.constructionTime}d</span>
+                        <span className="stat-value">{building.constructionTime}{t('stats.days')}</span>
                       </div>
                       <div className="stat-row">
                         <span>📏 {t('stats.size')}</span>
@@ -133,7 +133,7 @@ export function BuildMenu({ buildings, onSelectBuilding, onClose }: BuildMenuPro
                     </div>
                   </div>
                   <div className="build-action">
-                    <span>{t('actions.build') || 'BUILD'}</span>
+                    <span>{t('actions.build')}</span>
                   </div>
                 </div>
               ))}

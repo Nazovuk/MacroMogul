@@ -1,3 +1,4 @@
+import { useTranslation } from 'react-i18next';
 import './IsometricMap.css';
 import { useIsometricRenderer } from '../../rendering';
 import { GameWorld } from '../../core/ecs/world';
@@ -27,6 +28,7 @@ export function IsometricMap({
   onPlaced,
   onSelectEntity
 }: IsometricMapProps) {
+  const { t } = useTranslation();
   const {
     containerRef,
     isInitialized,
@@ -48,7 +50,7 @@ export function IsometricMap({
       {!isInitialized && (
         <div className="map-loading">
           <div className="loading-spinner"></div>
-          <p>Generating World...</p>
+          <p>{t('mainmenu.generating_world')}</p>
         </div>
       )}
     </div>

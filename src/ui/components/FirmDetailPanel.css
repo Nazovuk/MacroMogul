@@ -1,9 +1,9 @@
 .firm-detail-panel {
     position: fixed;
-    top: 160px;
+    top: 180px;
     right: 20px;
     width: 380px;
-    max-height: calc(100vh - 260px);
+    max-height: calc(100vh - 280px);
     background: rgba(15, 23, 42, 0.95);
     backdrop-filter: blur(12px);
     border: 1px solid rgba(255, 255, 255, 0.1);

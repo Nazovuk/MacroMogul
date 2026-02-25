@@ -1,3 +1,4 @@
+import { useTranslation } from 'react-i18next';
 import './MapOverlayMenu.css';
 
 interface MapOverlayMenuProps {
@@ -7,20 +8,20 @@ interface MapOverlayMenuProps {
 }
 
 export function MapOverlayMenu({ onSelectOverlay, activeOverlay, onClose }: MapOverlayMenuProps) {
-  // const { t } = useTranslation();
+  const { t } = useTranslation();
 
   const overlays = [
-    { id: 'pollution', label: 'Pollution', icon: '🏭', color: '#ff4757', desc: 'View air and water pollution levels' },
-    { id: 'traffic', label: 'Traffic', icon: '🚦', color: '#ffa502', desc: 'View traffic congestion' },
-    { id: 'land_value', label: 'Land Value', icon: '💰', color: '#2ed573', desc: 'Property prices and desirability' },
-    { id: 'sales_volume', label: 'Sales Volume', icon: '🛒', color: '#1e90ff', desc: 'Retail activity heatmap' },
-    { id: 'brand_awareness', label: 'Brand Power', icon: '⭐', color: '#a55eea', desc: 'Local brand recognition' }
+    { id: 'pollution', label: t('overlays.pollution'), icon: '🏭', color: '#ff4757', desc: t('overlays.pollution_desc') },
+    { id: 'traffic', label: t('overlays.traffic'), icon: '🚦', color: '#ffa502', desc: t('overlays.traffic_desc') },
+    { id: 'land_value', label: t('overlays.land_value'), icon: '💰', color: '#2ed573', desc: t('overlays.land_value_desc') },
+    { id: 'sales_volume', label: t('overlays.sales_volume'), icon: '🛒', color: '#1e90ff', desc: t('overlays.sales_volume_desc') },
+    { id: 'brand_awareness', label: t('overlays.brand_power'), icon: '⭐', color: '#a55eea', desc: t('overlays.brand_power_desc') }
   ];
 
   return (
     <div className="overlay-menu animate-slideUp">
       <div className="overlay-header">
-        <h3>Map Layers</h3>
+        <h3>{t('overlays.title')}</h3>
         <button className="close-btn" onClick={onClose}>×</button>
       </div>
       <div className="overlay-grid">

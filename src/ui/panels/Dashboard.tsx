@@ -73,9 +73,10 @@ const generateStockData = (points: number, tick: number) => {
   return data;
 };
 
-const generateRevenueData = (tick: number) => {
+const generateRevenueData = (tick: number, t: any) => {
+  const monthKeys = ['jan', 'feb', 'mar', 'apr', 'may', 'jun', 'jul', 'aug', 'sep', 'oct', 'nov', 'dec'];
   return Array.from({ length: 12 }, (_, i) => ({
-    month: ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'][i],
+    month: t(`months.${monthKeys[i]}`, { defaultValue: monthKeys[i].toUpperCase() }),
     revenue: Math.floor(Math.sin((tick + i) * 0.5) * 20000 + 50000),
     expenses: Math.floor(Math.sin((tick + i) * 0.3) * 15000 + 25000),
     profit: 0,
@@ -87,12 +88,12 @@ const generateRevenueData = (tick: number) => {
   }));
 };
 
-const generateMarketShareData = () => [
-  { name: 'Your Corp', value: 35, color: '#e94560' },
-  { name: 'Competitor A', value: 25, color: '#70a1ff' },
-  { name: 'Competitor B', value: 20, color: '#00d9a5' },
-  { name: 'Competitor C', value: 15, color: '#ffa502' },
-  { name: 'Others', value: 5, color: '#747d8c' },
+const generateMarketShareData = (t: any) => [
+  { name: t('finance.your_corp', { defaultValue: 'Your Corp' }), value: 35, color: '#e94560' },
+  { name: t('finance.competitor_a', { defaultValue: 'Competitor A' }), value: 25, color: '#70a1ff' },
+  { name: t('finance.competitor_b', { defaultValue: 'Competitor B' }), value: 20, color: '#00d9a5' },
+  { name: t('finance.competitor_c', { defaultValue: 'Competitor C' }), value: 15, color: '#ffa502' },
+  { name: t('finance.others', { defaultValue: 'Others' }), value: 5, color: '#747d8c' },
 ];
 
 
@@ -122,15 +123,15 @@ export function Dashboard({
   const [selectedCategory, setSelectedCategory] = useState<string>('all');
   
   // REAL SIMULATION DATA - Connected to game tick
-  const revenueData = useMemo(() => generateRevenueData(gameTick), [gameTick]);
+  const revenueData = useMemo(() => generateRevenueData(gameTick, t), [gameTick, t]);
   
   const economyMarketShareData = useMemo(() => {
-    if (!world) return generateMarketShareData();
+    if (!world) return generateMarketShareData(t);
     
     const marketQuery = defineQuery([MarketData, Inventory]);
     const entities = marketQuery(world.ecsWorld);
     
-    if (entities.length === 0) return generateMarketShareData();
+    if (entities.length === 0) return generateMarketShareData(t);
 
     const colors = ['#e94560', '#70a1ff', '#00d9a5', '#ffa502', '#5352ed'];
 
@@ -147,8 +148,8 @@ export function Dashboard({
       };
     }).slice(0, 5); // top 5
 
-    return realData.length > 0 ? realData : generateMarketShareData();
-  }, [world, gameTick]);
+    return realData.length > 0 ? realData : generateMarketShareData(t);
+  }, [world, gameTick, t]);
 
   // Connect Stock Price to real Market Price if possible
   const liveStockData = useMemo(() => {
@@ -814,7 +815,7 @@ function KpiCard({ title, value, change, icon, color }: {
   );
 }
 
-function ProductCard({ product, labels, t }: { product: ProductData; labels: any; t: (key: string) => string }) {
+function ProductCard({ product, labels, t }: { product: ProductData; labels: any; t: (key: string, options?: any) => string }) {
 
 
   const categoryColors: Record<string, string> = {
@@ -848,7 +849,7 @@ function ProductCard({ product, labels, t }: { product: ProductData; labels: any
 
 
       </div>
-      <h3 className="card-title">{t(`products.${product.name}`) || product.name}</h3>
+      <h3 className="card-title">{t(`products.${product.name}`, { defaultValue: product.name })}</h3>
 
       <div className="card-stats">
         <div className="stat">
@@ -911,7 +912,7 @@ function ProductCard({ product, labels, t }: { product: ProductData; labels: any
   );
 }
 
-function BuildingCard({ building, labels, t }: { building: BuildingData; labels: any; t: (key: string) => string }) {
+function BuildingCard({ building, labels, t }: { building: BuildingData; labels: any; t: (key: string, options?: any) => string }) {
 
 
   const typeIcons: Record<string, string> = {
@@ -926,7 +927,7 @@ function BuildingCard({ building, labels, t }: { building: BuildingData; labels:
   return (
     <div className="glass-card building-card">
       <div className="card-icon">{typeIcons[building.type]}</div>
-      <h3 className="card-title">{t(`buildings.${building.name}`) || building.name}</h3>
+      <h3 className="card-title">{t(`buildings.${building.name}`, { defaultValue: building.name })}</h3>
       <span className="type-badge">{labels.typeLabels?.[building.type] || building.type}</span>
 
       <div className="card-stats">
@@ -1410,7 +1411,7 @@ function OwnedBuildingCard({ building, formatCurrency, onUpgrade, t }: {
   building: any; 
   formatCurrency: (n: number) => string;
   onUpgrade?: () => void;
-  t: (key: string) => string;
+  t: (key: string, options?: any) => string;
 }) {
   const typeIcons: Record<string, string> = {
     FARM: '🚜',
@@ -1425,7 +1426,7 @@ function OwnedBuildingCard({ building, formatCurrency, onUpgrade, t }: {
     <div className="glass-card building-card owned">
       <div className="card-icon">{typeIcons[building.type] || '🏢'}</div>
       <div className="level-badge">LVL {building.level}</div>
-      <h3 className="card-title">{t(`buildings.${building.name}`) || building.name}</h3>
+      <h3 className="card-title">{t(`buildings.${building.name}`, { defaultValue: building.name })}</h3>
       <span className="type-badge">{building.type}</span>
 
       <div className="card-stats">

@@ -1,5 +1,5 @@
 import { defineQuery } from 'bitecs'
-import { LogisticSupply, Inventory, Building, Company, Finances, Position } from '../components'
+import { LogisticSupply, Inventory, Building, Company, Finances, Position, Strike, Executive } from '../components'
 import { GameWorld } from '../world'
 import { ProductCategory } from '../../data/types'
 import { globalFuelPrice } from './MacroEconomySystem'
@@ -102,6 +102,21 @@ export const logisticsSystem = (world: GameWorld) => {
   const supplyQuery = defineQuery([LogisticSupply, Inventory, Building, Company, Position])
   const destinations = supplyQuery(world.ecsWorld)
 
+  // Pre-calculate COO logistics discount per company
+  const cooQuery = defineQuery([Executive, Company]);
+  const cooEntities = cooQuery(world.ecsWorld);
+  const cooDiscounts = new Map<number, number>(); // companyId -> discount multiplier
+
+  for (const eid of cooEntities) {
+    if (Executive.role[eid] === 1) { // 1 = COO
+      const compId = Company.companyId[eid];
+      // Max 30% discount at 100 manufacturing expertise
+      const expertise = Executive.expertiseManufacturing[eid] || 0;
+      const discount = Math.max(0.7, 1.0 - (expertise / 100) * 0.30);
+      cooDiscounts.set(compId, discount);
+    }
+  }
+
   // Track total logistics expenses per company for monthly reporting
   const logisticsExpenses = new Map<number, number>()
 
@@ -136,6 +151,15 @@ export const logisticsSystem = (world: GameWorld) => {
 
       if (sourceProdId !== productId || sourceStock <= 0) continue
 
+      // ─── Supply Chain Disruption (Strikes) ───
+      const destStrike = Strike.severity[destId] || 0
+      const sourceStrike = Strike.severity[sourceId] || 0
+      if (destStrike >= 2 || sourceStrike >= 2) {
+         // Critical strike completely freezes logistics in or out of this facility
+         continue
+      }
+      const strikePenalty = (destStrike === 1 || sourceStrike === 1) ? 2.0 : 1.0 // 2x transport cost during minor strikes
+
       // ─── Destination Capacity ───
       const destCap = 5000 * Math.max(1, destSize)
       
@@ -158,7 +182,9 @@ export const logisticsSystem = (world: GameWorld) => {
 
       // ─── Transfer Rate ───
       const transferRate = BASE_TRANSFER_RATE * Math.max(1, Math.sqrt(destSize))
-      const toMove = Math.min(sourceStock, room, transferRate)
+      // Supply chain shock due to strikes
+      const shockModifier = destStrike === 1 || sourceStrike === 1 ? 0.5 : 1.0;
+      const toMove = Math.min(sourceStock, room, transferRate * shockModifier)
 
       if (toMove <= 0) continue
 
@@ -182,7 +208,12 @@ export const logisticsSystem = (world: GameWorld) => {
         ? 1 + ((gridDistance - MAX_EFFICIENT_DISTANCE) / 100) 
         : 1.0
 
-      const costPerUnit = Math.max(MIN_TRANSPORT_COST, Math.floor(gridDistance * baseCostRate * fuelFactor * distanceMult * distancePenalty / 100))
+      // ─── COO Logistics Optimization ───
+      const ownerId = Company.companyId[destId]
+      const cooDiscount = ownerId ? (cooDiscounts.get(ownerId) || 1.0) : 1.0;
+
+      const rawUnitCost = Math.floor(gridDistance * baseCostRate * fuelFactor * distanceMult * distancePenalty * cooDiscount * strikePenalty / 100)
+      const costPerUnit = Math.max(MIN_TRANSPORT_COST, rawUnitCost)
       const totalTransferCost = Math.floor((costPerUnit * toMove) / 100)
 
       // ─── Quality Blending ───
@@ -194,13 +225,16 @@ export const logisticsSystem = (world: GameWorld) => {
         )
       }
 
-      // Cross-city spoilage
+      // Cross-city spoilage & Theft risk
       if (isCrossCity && newQuality > 0) {
         const product = world.dataStore.getProduct(productId)
         const isPerishable = product?.category === ProductCategory.RAW
-        if (isPerishable) {
-          newQuality = Math.max(1, newQuality - Math.floor(newQuality * 0.03))
-        }
+        
+        let spoilageFactor = isPerishable ? 0.03 : 0.01;
+        // Bad logistics management (no COO discount) increases spoilage/theft risk
+        if (cooDiscount > 0.95) spoilageFactor *= 1.5; 
+
+        newQuality = Math.max(1, newQuality - Math.floor(newQuality * spoilageFactor))
       }
 
       // ─── Update Destination ───
@@ -222,7 +256,6 @@ export const logisticsSystem = (world: GameWorld) => {
       Inventory.currentAmount[sourceId] -= toMove
 
       // ─── Financial Deduction ───
-      const ownerId = Company.companyId[destId]
       if (ownerId > 0 && totalTransferCost > 0) {
         Finances.cash[ownerId] -= totalTransferCost
         logisticsExpenses.set(ownerId, (logisticsExpenses.get(ownerId) || 0) + totalTransferCost)
@@ -236,7 +269,15 @@ export const logisticsSystem = (world: GameWorld) => {
   // Monthly Expense Reporting
   if (world.tick % 30 === 0) {
     for (const [companyId, expense] of logisticsExpenses) {
-      Company.expensesLastMonth[companyId] = (Company.expensesLastMonth[companyId] || 0) + expense
+      if (companyId > 0) {
+        Finances.cash[companyId] -= expense
+        Company.currentMonthExpenses[companyId] = (Company.currentMonthExpenses[companyId] || 0) + expense
+        
+        // Sync player cash if this is the player's company
+        if (companyId === world.playerEntityId) {
+          world.cash -= expense
+        }
+      }
     }
   }
 

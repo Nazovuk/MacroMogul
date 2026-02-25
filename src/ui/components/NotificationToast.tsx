@@ -1,14 +1,16 @@
-
 import React, { useEffect, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 
 export interface GameNotification {
     id: string;
+    title?: string;
     message: string;
     type: 'info' | 'warning' | 'danger' | 'success';
     timestamp: number;
 }
 
 export const NotificationToast: React.FC = () => {
+    const { t } = useTranslation();
     const [notifications, setNotifications] = useState<GameNotification[]>([]);
 
     useEffect(() => {
@@ -37,40 +39,87 @@ export const NotificationToast: React.FC = () => {
     return (
         <div className="notification-container" style={{
             position: 'fixed',
-            bottom: '80px', // Above bottom toolbar
-            right: '20px',
-            zIndex: 9999,
+            bottom: '100px',
+            right: '25px',
+            zIndex: 10000,
             display: 'flex',
             flexDirection: 'column',
-            gap: '10px',
-            pointerEvents: 'none' // Click through
+            gap: '12px',
+            pointerEvents: 'none'
         }}>
             {notifications.map(note => (
                 <div key={note.id} className={`notification-toast type-${note.type}`} style={{
-                    background: 'rgba(20, 24, 32, 0.95)',
+                    background: 'linear-gradient(135deg, rgba(26, 31, 46, 0.95), rgba(18, 22, 33, 0.98))',
                     borderLeft: `4px solid ${getColorForType(note.type)}`,
-                    padding: '12px 16px',
-                    borderRadius: '4px',
+                    padding: '16px 20px',
+                    borderRadius: '12px',
                     color: '#fff',
-                    boxShadow: '0 4px 12px rgba(0,0,0,0.5)',
-                    minWidth: '300px',
-                    maxWidth: '400px',
-                    animation: 'slideIn 0.3s ease-out',
-                    backdropFilter: 'blur(8px)',
-                    fontFamily: 'Inter, sans-serif',
-                    fontSize: '14px',
+                    boxShadow: '0 10px 25px -5px rgba(0, 0, 0, 0.6), 0 8px 10px -6px rgba(0, 0, 0, 0.3)',
+                    minWidth: '320px',
+                    maxWidth: '450px',
+                    animation: 'notificationSlideIn 0.4s cubic-bezier(0.16, 1, 0.3, 1)',
+                    backdropFilter: 'blur(12px)',
+                    fontFamily: 'system-ui, -apple-system, sans-serif',
                     display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'space-between',
-                    pointerEvents: 'auto'
+                    flexDirection: 'column',
+                    gap: '4px',
+                    pointerEvents: 'auto',
+                    position: 'relative',
+                    overflow: 'hidden'
                 }}>
-                    <span>{note.message}</span>
+                    {note.title && (
+                        <div style={{
+                            fontSize: '11px',
+                            textTransform: 'uppercase',
+                            letterSpacing: '0.05em',
+                            fontWeight: 700,
+                            color: getColorForType(note.type),
+                            opacity: 0.9
+                        }}>
+                            {note.title}
+                        </div>
+                    )}
+                    <div style={{
+                        fontSize: '14px',
+                        lineHeight: '1.5',
+                        fontWeight: 400,
+                        color: 'rgba(255, 255, 255, 0.95)'
+                    }}>
+                        {(() => {
+                            if (!note.message) return '';
+                            if (note.message.includes('|')) {
+                                const [key, paramsStr] = note.message.split('|');
+                                try {
+                                    const params = JSON.parse(paramsStr);
+                                    return t(key, params) as string;
+                                } catch (e) {
+                                    return t(key) as string;
+                                }
+                            }
+                            return t(note.message) as string;
+                        })()}
+                    </div>
                 </div>
             ))}
             <style>{`
-                @keyframes slideIn {
-                    from { transform: translateX(100%); opacity: 0; }
-                    to { transform: translateX(0); opacity: 1; }
+                @keyframes notificationSlideIn {
+                    from { transform: translateX(120%); opacity: 0; filter: blur(10px); }
+                    to { transform: translateX(0); opacity: 1; filter: blur(0); }
+                }
+                .notification-toast::after {
+                    content: "";
+                    position: absolute;
+                    bottom: 0;
+                    left: 0;
+                    height: 2px;
+                    background: currentColor;
+                    opacity: 0.3;
+                    width: 100%;
+                    animation: lifeSpan 5s linear forwards;
+                }
+                @keyframes lifeSpan {
+                    from { width: 100%; }
+                    to { width: 0%; }
                 }
             `}</style>
         </div>

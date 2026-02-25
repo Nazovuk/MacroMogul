@@ -1,0 +1,42 @@
+# Kimi Görev Listesi - MacroMogul
+
+## Aktif Görevler (Yüksek Öncelik)
+
+### 1. ECS Market Simulation - Competitor AI
+**Durum:** TAMAMLANDI ✅
+**Dosyalar:** `src/core/ecs/systems/CompetitorSystem.ts`, `src/core/ecs/components.ts`  
+**Açıklama:** Rakip firmalar artık oyuncunun pazar payına ve fiyatlarına agresif tepki veriyor.
+
+### 2. Financial Systems - Loans & Bonds
+**Durum:** TAMAMLANDI ✅
+**Dosyalar:** `src/core/ecs/systems/FinancialSystem.ts`, `src/ui/components/FinancialDashboard.tsx`  
+**Açıklama:** Kredi çekme, geri ödeme ve kredi notu sistemleri UI ile entegre edildi.
+
+### 3. Save/Load Integrity
+**Durum:** DEVAM EDİYOR ⏳
+**Dosyalar:** `src/core/services/PersistenceService.ts`  
+**Açıklama:** Finans verilerinin (loan/bond) save sistemine dahil edildiği doğrulandı.
+
+### 4. IsometricMap Rendering
+**Durum:** TAMAMLANDI ✅
+**Dosyalar:** `src/ui/components/IsometricMap.tsx`, `src/rendering/systems/RenderingSystem.ts`
+**Açıklama:** bitECS world state izometrik rendering'e bağlandı. Şehirler ve binalar senkronize edildi.
+
+### 5. Internal Management Logic
+**Durum:** DEVAM EDİYOR ⏳
+**Dosyalar:** `src/core/ecs/systems/ManagementSystem.ts`  
+**Açıklama:** Moral, eğitim, verimlilik ve yan haklar (benefits) mantığı implemente edildi. Turnover maliyetleri ve grev mekanizması eklendi.
+
+## UI Görevleri (Orta Öncelik)
+- [x] Dashboard finansal verileri ECS'ye bağlama
+- [x] Dashboard glassmorphism iyileştirmeleri
+- [x] MainMenu.css düzenlemeleri
+- [x] i18n key'lerinin genişletilmesi
+- [x] Load Game modal'ı ekleme
+
+## Sonraki Adımlar
+1. IsometricMap.tsx analiz et
+2. ECS Entity -> Isometric Rendering köprüsünü kur
+3. Şehir içi bina yerleşimini görselleştir
+
+**Son Güncelleme:** 2026-02-20

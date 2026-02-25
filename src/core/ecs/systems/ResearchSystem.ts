@@ -7,8 +7,9 @@ import {
   Finances,
   CityEconomicData,
   Position,
+  Executive
 } from '../components'
-import { GameWorld } from '../world'
+import { GameWorld, updateTechLookup, getGlobalTechLevel } from '../world'
 
 /**
  * ResearchSystem — Technology Advancement Engine
@@ -99,12 +100,13 @@ export const researchSystem = (world: GameWorld) => {
     // ─── Financial Deduction (prorated daily) ───
     const monthlyCost = BASE_RESEARCH_COSTS[tier] || BASE_RESEARCH_COSTS[4]
     if (world.tick % 30 === 0) {
-      const dailyCost = Math.floor(monthlyCost / 30)
-      Finances.cash[companyId] -= dailyCost
-      
-      // Track as expense
-      Company.expensesLastMonth[companyId] = (Company.expensesLastMonth[companyId] || 0) + dailyCost
+      const directive = Company.strategicDirective[companyId] || 0
+      let directiveCostMult = 1.0
+      if (directive === 3) directiveCostMult = 0.85 // Lean Operations (15% cheaper R&D)
 
+      const dailyCost = Math.floor((monthlyCost / 30) * directiveCostMult)
+      Finances.cash[companyId] -= dailyCost
+      Company.currentMonthExpenses[companyId] = (Company.currentMonthExpenses[companyId] || 0) + dailyCost
       if (companyId === world.playerEntityId) {
         world.cash -= dailyCost
       }
@@ -127,19 +129,72 @@ export const researchSystem = (world: GameWorld) => {
     const diminishingFactor = Math.max(0.3, 1 / Math.sqrt(Math.max(1, currentTechLevel / 40)))
 
     // Final innovation speed
-    const speed = baseSpeed * talentMult * spilloverMult * diminishingFactor
+    const directive = Company.strategicDirective[companyId] || 0
+    let directiveSpeedMult = 1.0
+    if (directive === 1) directiveSpeedMult = 1.25 // Quality Leadership boosts R&D
+    if (directive === 3) directiveSpeedMult = 0.8 // Lean operations slows R&D
+
+    const speed = baseSpeed * talentMult * spilloverMult * diminishingFactor * directiveSpeedMult
 
     ResearchCenter.innovationPoints[id] += speed
 
-    // ─── Breakthrough Logic ───
     const threshold = BREAKTHROUGH_THRESHOLDS[tier] || BREAKTHROUGH_THRESHOLDS[4]
 
+    // ─── CORPORATE ESPIONAGE (THEFT & POACHING) ───
+    if (world.tick % 900 === 0 && tier < 4) { // Check once a month
+       const globalLeaderLevel = getGlobalTechLevel(world, productId);
+       if (currentTechLevel < globalLeaderLevel - 15) { // At least 15 points behind leader
+           // We are trailing the market leader - try to catch up by poaching!
+           const execQuery = defineQuery([Executive, Company]);
+           const hasCTO = execQuery(world.ecsWorld).some(eid => Company.companyId[eid] === companyId && Executive.role[eid] === 2); // 2 is CTO
+           
+           // A strong CTO has "industry connections" to poach tech/talent
+           const espionageChance = hasCTO ? 0.08 : 0.02; // 8% per month with CTO, 2% without
+           
+           if (Math.random() < espionageChance) {
+               // SUCCESSFUL ESPIONAGE!
+               ResearchCenter.innovationPoints[id] += (threshold * 0.75); // Instant 75% boost towards next breakthrough
+               
+               // Find the leader we stole from
+               let leaderId = 0;
+               world.techLookup.forEach((productMap, cId) => {
+                   if (productMap.get(productId) === globalLeaderLevel) leaderId = cId;
+               });
+               
+               const pName = world.dataStore.getProduct(productId)?.name || `#${productId}`;
+               
+               if (leaderId > 0 && leaderId !== companyId) {
+                   const compName = companyId === world.playerEntityId ? 'Player' : `Competitor ${companyId}`;
+                   const leaderName = leaderId === world.playerEntityId ? 'Player' : `Competitor ${leaderId}`;
+
+                   world.newsFeed.unshift({
+                       id: `esp_tech_${companyId}_${world.tick}`,
+                       type: 'tech',
+                       title: 'Industrial Espionage!',
+                       content: `${compName} was caught heavily poaching key engineers from ${leaderName}, rapidly accelerating their ${pName} R&D!`,
+                       timestamp: Date.now()
+                   });
+                   if (world.newsFeed.length > 50) world.newsFeed.pop();
+                   
+                   // The thief suffers a reputation hit if caught via "news"
+                   Company.reputation[companyId] = Math.max(0, (Company.reputation[companyId] || 50) - 8);
+                   
+                   // Leader's CTO gets pissed and morale drops (optional logic)
+               }
+           }
+       }
+    }
+
+    // ─── Breakthrough Logic ───
     if (ResearchCenter.innovationPoints[id] >= threshold) {
       ResearchCenter.innovationPoints[id] = 0
       
       // Tech level increase varies by tier (harder tiers give bigger jumps)
       const levelGain = tier < 3 ? 10 : (tier < 4 ? 8 : 5) // Smaller gains at top
       CompanyTechnology.techLevel[techEntity] += levelGain
+      
+      // Update fast lookup and global tech
+      updateTechLookup(world, companyId, productId, CompanyTechnology.techLevel[techEntity])
       
       // Reputation boost for breakthroughs (visible company innovation)
       const currentRep = Company.reputation[companyId] || 50
@@ -178,6 +233,8 @@ const findOrCreateCompanyTech = (world: GameWorld, companyId: number, productId:
   CompanyTechnology.companyId[newEntity] = companyId
   CompanyTechnology.productId[newEntity] = productId
   CompanyTechnology.techLevel[newEntity] = 40 // Starting baseline
+  
+  updateTechLookup(world, companyId, productId, 40)
   
   return newEntity
 }

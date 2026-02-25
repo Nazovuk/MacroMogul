@@ -26,10 +26,11 @@ import {
   Stock,
   ProductBrand,
   MarketData,
+  Strike,
 } from './components'
 import { DataStore } from '../data'
 import { BuildingType } from '../data/types'
-import { macroEconomySystem, marketingSystem, productionSystem, financialSystem, retailSystem, researchSystem, logisticsSystem, economySystem, competitorSystem, managementSystem, stockMarketSystem } from './systems'
+import { macroEconomySystem, marketingSystem, productionSystem, financialSystem, retailSystem, researchSystem, logisticsSystem, economySystem, competitorSystem, managementSystem, stockMarketSystem, techSystem } from './systems'
 
 export interface GameWorld {
   ecsWorld: IWorld
@@ -43,6 +44,13 @@ export interface GameWorld {
   seed: number
   dataStore: DataStore
   playerEntityId: number
+  // Efficient Lookups
+  techLookup: Map<number, Map<number, number>> // CompanyID -> ProductID -> TechLevel
+  globalProductTech: Map<number, number> // ProductID -> Highest tech level in world (for obsolescence)
+  techAlerts: Map<number, Set<number>> // CompanyID -> Set of product IDs needing R&D
+  registeredCompanies: number[]
+  portfolio: { entityId: number; shares: number; avgCostBasis: number }[]
+  newsFeed: { id: string, type: 'market' | 'finance' | 'tech' | 'expansion', title: string, content: string, timestamp: number }[]
   components: {
     Position: typeof Position
     EntityType: typeof EntityType
@@ -67,6 +75,7 @@ export interface GameWorld {
     Inventory: typeof Inventory
     LogisticSupply: typeof LogisticSupply
     MarketData: typeof MarketData
+    Strike: typeof Strike
   }
 }
 
@@ -85,6 +94,12 @@ export function createGameWorld(seed: number = 12345): GameWorld {
     seed,
     dataStore: new DataStore(),
     playerEntityId: 0,
+    techLookup: new Map(),
+    globalProductTech: new Map(),
+    techAlerts: new Map(),
+    registeredCompanies: [],
+    portfolio: [],
+    newsFeed: [],
     components: {
       Position,
       EntityType,
@@ -109,6 +124,7 @@ export function createGameWorld(seed: number = 12345): GameWorld {
       Inventory,
       LogisticSupply,
       MarketData,
+      Strike,
     },
   }
 }
@@ -153,6 +169,8 @@ export function runSystems(world: GameWorld) {
   
   // 4. Management & HR
   managementSystem(world)
+  // Update technology and handle product obsolescence
+  techSystem(world)
 }
 
 export function createCity(world: GameWorld, x: number, y: number, cityId: number, population: number = 1000000): number {
@@ -249,6 +267,7 @@ export function createBuilding(
   // Initialize HR defaults
   HumanResources.headcount[entity] = 10 
   HumanResources.salary[entity] = 300000 // $3000/mo default (Market Wage)
+  HumanResources.benefits[entity] = 30000 // $300/mo default (10% of salary)
   HumanResources.morale[entity] = 50
   HumanResources.trainingLevel[entity] = 10
   HumanResources.trainingBudget[entity] = 10000 // $100/mo default (Low training)
@@ -272,11 +291,12 @@ export function createBuilding(
 
 export function createAICompany(world: GameWorld, name: string, cash: number): number {
   const symbol = name.split(' ').map(w => w[0]).join('').toUpperCase().slice(0, 4);
-  const entity = createCompany(world, cash, name, symbol);
+  const entity = createCompany(world, cash, name, symbol, true); // isAI = true
   
   addComponent(world.ecsWorld, AIController, entity);
   AIController.personality[entity] = Math.floor(Math.random() * 3);
-  AIController.expansionThreshold[entity] = cash * 1.5; // Expand when cash increases significantly
+  // Start with a threshold lower than initial cash so they bootstrap immediately
+  AIController.expansionThreshold[entity] = cash * 0.2; 
   AIController.lastActionTick[entity] = 0;
   
   console.log(`AI Company created: ${name} (ID: ${Company.companyId[entity]})`);
@@ -286,7 +306,7 @@ export function createAICompany(world: GameWorld, name: string, cash: number): n
 /**
  * Unified company creation logic for both player and AI.
  */
-export function createCompany(world: GameWorld, cashCents: number, name: string = "Player Corp", symbol: string = "PLR"): number {
+export function createCompany(world: GameWorld, cashCents: number, name: string = "Player Corp", symbol: string = "PLR", isAI: boolean = false): number {
   const entity = addEntity(world.ecsWorld);
   
   addComponent(world.ecsWorld, Company, entity);
@@ -312,20 +332,121 @@ export function createCompany(world: GameWorld, cashCents: number, name: string 
     symbol,
     color: entity === world.playerEntityId ? '#00d9a5' : '#' + Math.floor(Math.random() * 16777215).toString(16).padStart(6, '0')
   });
+  
+  world.registeredCompanies.push(entity);
+  world.techLookup.set(entity, new Map());
 
   // Initialize tech for all products
-  initializeCompanyTech(world, entity);
+  initializeCompanyTech(world, entity, isAI);
   
   return entity;
 }
 
-export function initializeCompanyTech(world: GameWorld, companyId: number) {
+export function initializeCompanyTech(world: GameWorld, companyId: number, isAI: boolean = false) {
   const products = Array.from(world.dataStore.products.values());
+  const baseLevel = isAI ? 70 : 40; // AI starts with higher tech for competition
+  
   for (const p of products) {
     const techEntity = addEntity(world.ecsWorld);
     addComponent(world.ecsWorld, CompanyTechnology, techEntity);
     CompanyTechnology.companyId[techEntity] = companyId;
     CompanyTechnology.productId[techEntity] = p.id;
-    CompanyTechnology.techLevel[techEntity] = 40; // Base quality
+    CompanyTechnology.techLevel[techEntity] = baseLevel;
+    
+    // Update company lookup
+    const companyMap = world.techLookup.get(companyId);
+    if (companyMap) {
+      companyMap.set(p.id, baseLevel);
+    }
+    
+    // Update global tech (world's highest)
+    const currentGlobal = world.globalProductTech.get(p.id) || 0;
+    if (baseLevel > currentGlobal) {
+      world.globalProductTech.set(p.id, baseLevel);
+    }
   }
+}
+
+/**
+ * Update techLookup and globalProductTech after R&D breakthrough
+ */
+export function updateTechLookup(world: GameWorld, companyId: number, productId: number, newLevel: number) {
+  const companyMap = world.techLookup.get(companyId);
+  if (companyMap) {
+    companyMap.set(productId, newLevel);
+  }
+  
+  const currentGlobal = world.globalProductTech.get(productId) || 0;
+  if (newLevel > currentGlobal) {
+    world.globalProductTech.set(productId, newLevel);
+  }
+}
+
+/**
+ * Get tech level for a company/product (uses cached lookup)
+ */
+export function getCompanyTechLevel(world: GameWorld, companyId: number, productId: number): number {
+  return world.techLookup.get(companyId)?.get(productId) || 40;
+}
+
+/**
+ * Get global highest tech level for a product
+ */
+export function getGlobalTechLevel(world: GameWorld, productId: number): number {
+  return world.globalProductTech.get(productId) || 40;
+}
+
+/**
+ * Get competitor average tech level for a product (excluding specified company)
+ */
+export function getCompetitorAvgTechLevel(world: GameWorld, productId: number, excludeCompanyId: number): number {
+  let total = 0;
+  let count = 0;
+  for (const [companyId, productMap] of world.techLookup) {
+    if (companyId !== excludeCompanyId) {
+      const level = productMap.get(productId);
+      if (level !== undefined) {
+        total += level;
+        count++;
+      }
+    }
+  }
+  return count > 0 ? Math.floor(total / count) : 40;
+}
+export function spawnExecutive(
+  world: GameWorld, 
+  companyId: number, 
+  role: number, 
+  salary: number = 2500000 // $25k/mo baseline
+): number {
+  const entity = addEntity(world.ecsWorld)
+  addComponent(world.ecsWorld, Executive, entity)
+  addComponent(world.ecsWorld, Company, entity)
+  
+  Executive.role[entity] = role
+  Executive.salary[entity] = salary
+  Executive.loyalty[entity] = 70 + Math.floor(Math.random() * 30)
+  
+  // Random expertise based on role
+  Executive.expertiseManufacturing[entity] = role === 1 ? 80 : 20 + Math.floor(Math.random() * 40)
+  Executive.expertiseRD[entity] = role === 2 ? 80 : 20 + Math.floor(Math.random() * 40)
+  Executive.expertiseMarketing[entity] = role === 3 ? 80 : 20 + Math.floor(Math.random() * 40)
+  Executive.expertiseRetailing[entity] = role === 3 ? 60 : 20 + Math.floor(Math.random() * 40)
+  
+  Company.companyId[entity] = companyId
+  
+  return entity
+}
+export function hireRandomExecutive(world: GameWorld, companyId: number): number | undefined {
+  const query = defineQuery([Executive, Company])
+  const existing = query(world.ecsWorld).filter(id => Company.companyId[id] === companyId)
+  const filledRoles = existing.map(id => Executive.role[id])
+  
+  const allRoles = [1, 2, 3, 4, 5] // COO, CTO, CMO, CFO, CHRO
+  const availableRoles = allRoles.filter(r => !filledRoles.includes(r))
+  
+  if (availableRoles.length === 0) return undefined
+  
+  const selectedRole = availableRoles[Math.floor(Math.random() * availableRoles.length)]
+  return spawnExecutive(world, companyId, selectedRole)
 }

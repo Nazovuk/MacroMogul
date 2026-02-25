@@ -9,17 +9,19 @@ import {
   LogisticSupply,
   ResearchCenter,
   Company,
-  CompanyTechnology,
-  MarketingOffice,
   ProductBrand,
   Factory,
   RetailPlot,
   RetailExpertise,
   HumanResources,
-  Maintenance
+  Maintenance,
+  Strike,
+  CompanyTechnology,
+  MarketingOffice
 } from '../../core/ecs/components';
 import './FirmDetailPanel.css';
 import { BuildingType } from '../../core/data/types';
+import { findOptimalSupplier } from '../../core/ecs/systems/LogisticsSystem';
 
 interface FirmDetailPanelProps {
   entityId: number;
@@ -50,6 +52,10 @@ export function FirmDetailPanel({
   const buildingData = world.dataStore.getBuilding(buildingTypeId);
   const level = Building.level[entityId];
   const isOperational = Building.isOperational[entityId] === 1;
+
+  // Strike Status Data
+  const hasStrike = Strike.severity[entityId] !== undefined && Strike.severity[entityId] > 0;
+  const isCriticalStrike = Strike.severity[entityId] === 2;
 
   // Production data
   const capacity = ProductionOutput.capacity[entityId];
@@ -164,6 +170,50 @@ export function FirmDetailPanel({
     if (onUpdate) onUpdate();
   };
 
+  const handleAutoLink = () => {
+    let hasUpdates = false;
+    
+    // Determine requirements (only factories have strict recipe requirements)
+    const reqs: { slot: number; prodId: number }[] = [];
+    if (isFactory && recipeId) {
+      const recipe = world.dataStore.getRecipe(recipeId);
+      if (recipe) {
+        recipe.inputs.forEach((input, idx) => {
+          reqs.push({ slot: idx + 1, prodId: input.productId });
+        });
+      }
+    }
+    
+    if (reqs.length > 0) {
+      reqs.forEach(req => {
+        // Find potential suppliers that produce this product
+        const potentialIds = getPotentialSuppliers(req.slot);
+        const result = findOptimalSupplier(req.prodId, entityId, Array.from(potentialIds));
+        
+        if (result && result.supplierId !== 0) {
+          const supplierId = result.supplierId;
+          if (req.slot === 1) {
+            LogisticSupply.source1Id[entityId] = supplierId;
+            LogisticSupply.product1Id[entityId] = req.prodId;
+          } else if (req.slot === 2) {
+            LogisticSupply.source2Id[entityId] = supplierId;
+            LogisticSupply.product2Id[entityId] = req.prodId;
+          } else if (req.slot === 3) {
+            LogisticSupply.source3Id[entityId] = supplierId;
+            LogisticSupply.product3Id[entityId] = req.prodId;
+          }
+          LogisticSupply.autoSupply[entityId] = 1;
+          LogisticSupply.transportCost[entityId] = 50;
+          hasUpdates = true;
+        }
+      });
+    }
+
+    if (hasUpdates && onUpdate) {
+      onUpdate();
+    }
+  };
+
   // Retail check
   const isRetail = buildingData?.type === BuildingType.RETAIL || buildingData?.type === BuildingType.SUPERMARKET;
 
@@ -175,15 +225,15 @@ export function FirmDetailPanel({
       let amount = 0;
 
       if (isRetail) {
-        // For retail, get from input slots
-        if (slotIdx === 1) { pId = Inventory.input1ProductId[entityId]; quality = Inventory.input1Quality[entityId]; amount = Inventory.input1Amount[entityId]; }
-        if (slotIdx === 2) { pId = Inventory.input2ProductId[entityId]; quality = Inventory.input2Quality[entityId]; amount = Inventory.input2Amount[entityId]; }
-        if (slotIdx === 3) { pId = Inventory.input3ProductId[entityId]; quality = Inventory.input3Quality[entityId]; amount = Inventory.input3Amount[entityId]; }
+        // For retail, check Inventory, fallback to LogisticSupply if no stock yet but linked
+        if (slotIdx === 1) { pId = Inventory.input1ProductId[entityId] || LogisticSupply.product1Id[entityId]; quality = Inventory.input1Quality[entityId]; amount = Inventory.input1Amount[entityId]; sId = LogisticSupply.source1Id[entityId]; }
+        if (slotIdx === 2) { pId = Inventory.input2ProductId[entityId] || LogisticSupply.product2Id[entityId]; quality = Inventory.input2Quality[entityId]; amount = Inventory.input2Amount[entityId]; sId = LogisticSupply.source2Id[entityId]; }
+        if (slotIdx === 3) { pId = Inventory.input3ProductId[entityId] || LogisticSupply.product3Id[entityId]; quality = Inventory.input3Quality[entityId]; amount = Inventory.input3Amount[entityId]; sId = LogisticSupply.source3Id[entityId]; }
       } else {
         // For production, get from logistic supply
-        if (slotIdx === 1) { sId = LogisticSupply.source1Id[entityId]; pId = LogisticSupply.product1Id[entityId]; }
-        if (slotIdx === 2) { sId = LogisticSupply.source2Id[entityId]; pId = LogisticSupply.product2Id[entityId]; }
-        if (slotIdx === 3) { sId = LogisticSupply.source3Id[entityId]; pId = LogisticSupply.product3Id[entityId]; }
+        if (slotIdx === 1) { sId = LogisticSupply.source1Id[entityId]; pId = LogisticSupply.product1Id[entityId]; amount = Inventory.input1Amount[entityId]; quality = Inventory.input1Quality[entityId]; }
+        if (slotIdx === 2) { sId = LogisticSupply.source2Id[entityId]; pId = LogisticSupply.product2Id[entityId]; amount = Inventory.input2Amount[entityId]; quality = Inventory.input2Quality[entityId]; }
+        if (slotIdx === 3) { sId = LogisticSupply.source3Id[entityId]; pId = LogisticSupply.product3Id[entityId]; amount = Inventory.input3Amount[entityId]; quality = Inventory.input3Quality[entityId]; }
       }
 
       // Price handling for retail
@@ -213,22 +263,22 @@ export function FirmDetailPanel({
         <div key={slotIdx} className="supply-slot-container">
            <div className="slot-header">
              <span className="slot-label">{label}</span>
-             {isRetail && pId !== 0 && (
-               <div className="price-control">
-                 <label>Price:</label>
-                 <input
-                    type="number"
-                    value={price || 0}
-                    onChange={(e) => setPrice(parseInt(e.target.value) || 0)}
-                    className="price-input"
-                  />
-               </div>
-             )}
+              {isRetail && pId !== 0 && (
+                <div className="price-control">
+                  <label>{t('firm.price')}:</label>
+                  <input
+                     type="number"
+                     value={price || 0}
+                     onChange={(e) => setPrice(parseInt(e.target.value) || 0)}
+                     className="price-input"
+                   />
+                </div>
+              )}
            </div>
            {pId === 0 ? (
             <div className="supply-link empty" onClick={() => setSelectingSourceSlot(slotIdx)}>
               <span className="plus">+</span>
-              <span className="link-text">{isRetail ? "Add Product" : "Link Supplier"}</span>
+              <span className="link-text">{isRetail ? t('firm.add_product') : t('firm.link_supplier')}</span>
             </div>
           ) : (
             <div className="supply-link active" onClick={() => setSelectingSourceSlot(slotIdx)}>
@@ -236,9 +286,9 @@ export function FirmDetailPanel({
               <div className="link-details">
                 <span className="source-name">{isRetail ? `${amount.toLocaleString()} units` : `Firm #${sId}`}</span>
                 <span className="product-linked">{world.dataStore.getProduct(pId)?.name || 'Product'}</span>
-                {isRetail && (
-                  <div className="quality-indicator">
-                    <span className="quality-label">Quality:</span>
+                 {isRetail && (
+                   <div className="quality-indicator">
+                     <span className="quality-label">{t('firm.quality')}:</span>
                     <div className="quality-bar-mini">
                       <div
                         className="quality-fill"
@@ -282,58 +332,61 @@ export function FirmDetailPanel({
                 </span>
                 <span className="company-name">{companyMetadata?.name || 'Independent'}</span>
               </div>
-              <h2>{t(`buildings.${buildingData.name}`) || buildingData.name}</h2>
-              <span className="firm-subtitle">
-                Level {level} • {isOperational ? 'OPERATIONAL' : 'STOPPED'}
+              <h2>{t(`buildings.${buildingData.name}`, { defaultValue: buildingData.name })}</h2>
+              <span className="firm-subtitle" style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                <span>{t('firm.level')} {level} •</span>
+                {hasStrike ? (
+                    <span style={{ 
+                        color: isCriticalStrike ? '#ef4444' : '#fbbf24', 
+                        fontWeight: 'bold',
+                        display: 'flex', 
+                        alignItems: 'center', 
+                        gap: '4px' 
+                    }}>
+                        <span style={{ fontSize: '14px' }}>⚠️</span>
+                        {isCriticalStrike ? 'CRITICAL STRIKE (HALTED)' : 'MINOR STRIKE (REDUCED EFFICIENCY)'}
+                    </span>
+                 ) : (
+                    <span>{isOperational ? t('firm.operational') : t('firm.stopped')}</span>
+                 )}
               </span>
             </div>
           </div>
           <button 
-            className="close-btn" 
+            className="premium-icon-btn" 
             onClick={onClose}
-            style={{
-              background: '#ef4444',
-              color: 'white',
-              border: 'none',
-              borderRadius: '8px',
-              width: '36px',
-              height: '36px',
-              fontSize: '20px',
-              cursor: 'pointer',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              fontWeight: 'bold',
-              zIndex: 1001,
-              flexShrink: 0,
-              marginLeft: '10px'
-            }}
+            style={{ 
+              '--btn-color': '#ef4444',
+              marginLeft: '10px',
+              zIndex: 1001
+            } as React.CSSProperties}
           >
             ✕
+            <div className="btn-glow"></div>
           </button>
         </div>
 
       <div className="firm-content">
         <section className="firm-section">
-          <h3>FIRM OVERVIEW</h3>
+          <h3>{t('firm.overview')}</h3>
           <div className="stat-grid">
             <div className="stat-item">
-              <span className="label">Capacity</span>
+              <span className="label">{t('firm.capacity')}</span>
               <span className="value">{capacity.toLocaleString()}</span>
             </div>
             <div className="stat-item">
-              <span className="label">Output</span>
+              <span className="label">{t('firm.output')}</span>
               <span className="value">{actualOutput.toLocaleString()}</span>
             </div>
             <div className="stat-item">
-                <span className="label">Utilization</span>
+                <span className="label">{t('firm.utilization')}</span>
                 <div className="progress-bar">
                     <div className="progress-fill" style={{ width: `${utilization}%` }}></div>
                 </div>
             </div>
             {isFactory && (
              <div className="stat-item">
-                <span className="label">Efficiency</span>
+                <span className="label">{t('firm.efficiency')}</span>
                 <div className="progress-bar">
                     <div className="progress-fill" style={{ width: `${Math.min(200, Factory.efficiency[entityId] || 100)}%`, background: '#10b981' }}></div>
                 </div>
@@ -349,7 +402,7 @@ export function FirmDetailPanel({
             )}
             {isRetail && (
              <div className="stat-item">
-                <span className="label">Retail Expertise</span>
+                <span className="label">{t('firm.retail_expertise')}</span>
                 <div className="progress-bar">
                     <div className="progress-fill" style={{ width: `${Math.min(200, RetailExpertise.general[entityId] || 50)}%`, background: '#8b5cf6' }}></div>
                 </div>
@@ -368,10 +421,10 @@ export function FirmDetailPanel({
 
         {HumanResources.headcount[entityId] !== undefined && (
         <section className="firm-section">
-          <h3>HUMAN RESOURCES</h3>
+          <h3>{t('firm.human_resources')}</h3>
           <div className="stat-grid hr-grid">
              <div className="stat-item full-width">
-                <span className="label">Staffing</span>
+                <span className="label">{t('firm.headcount')}</span>
                 <div className="capacity-bar-container">
                   <div className="capacity-bar">
                     <div 
@@ -383,13 +436,13 @@ export function FirmDetailPanel({
                     />
                   </div>
                   <span className="capacity-text">
-                    {HumanResources.headcount[entityId]} / {Math.floor(capacity * 0.1)} employees
+                    {HumanResources.headcount[entityId]} / {Math.floor(capacity * 0.1)} {t('firm.employees')}
                   </span>
                 </div>
              </div>
              
              <div className="stat-item full-width">
-                <span className="label">Salary / Monthly</span>
+                <span className="label">{t('firm.salary_monthly')}</span>
                 <div className="slider-control">
                     <input 
                         type="range" 
@@ -407,7 +460,7 @@ export function FirmDetailPanel({
              </div>
 
              <div className="stat-item full-width">
-                <span className="label">Training Budget</span>
+                <span className="label">{t('firm.training_budget')}</span>
                 <div className="slider-control">
                     <input 
                         type="range" 
@@ -426,7 +479,7 @@ export function FirmDetailPanel({
 
              <div className="stat-item">
                 <span className="label">
-                  Morale
+                  {t('firm.morale')}
                   {(HumanResources.morale[entityId] || 50) < 30 && (
                     <span title="Critical morale! Workers may quit or strike." style={{ marginLeft: '6px', color: '#ef4444', fontSize: '14px' }}>⚠️</span>
                   )}
@@ -434,14 +487,42 @@ export function FirmDetailPanel({
                 <div className="progress-bar small">
                     <div
                         className="progress-fill"
-                        style={{ width: `${HumanResources.morale[entityId] || 50}%`, background: getMoraleColor(HumanResources.morale[entityId] || 50) }}
+                        style={{ width: `${Math.max(0, Math.min(100, HumanResources.morale[entityId] || 50))}%`, background: getMoraleColor(HumanResources.morale[entityId] || 50) }}
                     ></div>
                 </div>
                 <span className="mini-val">{HumanResources.morale[entityId] || 50}%</span>
              </div>
 
+             {/* Turnover and Hiring Cost Estimate */}
+             <div className="stat-item full-width turnover-metrics" style={{ marginTop: '10px', background: 'rgba(0,0,0,0.15)', padding: '12px', borderRadius: '8px', border: '1px solid rgba(255,255,255,0.05)' }}>
+                 <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '8px' }}>
+                     <span style={{ fontSize: '0.75rem', color: '#94a3b8', textTransform: 'uppercase' }}>Est. Monthly Turnover</span>
+                     <span style={{ fontSize: '0.85rem', fontWeight: 700, color: (HumanResources.morale[entityId] || 50) < 40 ? '#ef4444' : '#f8fafc' }}>
+                         {(() => {
+                            const morale = HumanResources.morale[entityId] || 50;
+                            let rate = 0.02; // Base 2%
+                            if (morale < 30) rate = 0.15;
+                            else if (morale < 50) rate = 0.08;
+                            else if (morale > 80) rate = 0.01;
+                            return (rate * 100).toFixed(1) + '%';
+                         })()}
+                     </span>
+                 </div>
+                 <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                     <span style={{ fontSize: '0.75rem', color: '#94a3b8', textTransform: 'uppercase' }}>Avg Replacement Cost</span>
+                     <span style={{ fontSize: '0.85rem', fontWeight: 700, color: '#fbbf24' }}>
+                         {(() => {
+                             const hc = HumanResources.headcount[entityId] || 0;
+                             const tb = HumanResources.trainingBudget[entityId] || 0;
+                             const costPerEmployee = 50000 + (tb / Math.max(1, hc) * 2); 
+                             return '$' + (Math.floor(costPerEmployee/100)).toLocaleString();
+                         })()}
+                     </span>
+                 </div>
+             </div>
+
               <div className="stat-item">
-                 <span className="label">Training</span>
+                 <span className="label">{t('firm.training')}</span>
                  <div className="progress-bar small">
                      <div 
                          className="progress-fill" 
@@ -456,7 +537,7 @@ export function FirmDetailPanel({
 
         {/* Building Health & Maintenance Section */}
         <section className="firm-section health-section">
-          <h3>🏗️ BUILDING HEALTH</h3>
+          <h3>🏗️ {t('firm.building_health')}</h3>
           <div className="health-overview">
             <div className="health-main">
               <div className={`health-status ${healthStatus}`}>
@@ -479,17 +560,17 @@ export function FirmDetailPanel({
             
             <div className="maintenance-details">
               <div className="maintenance-item">
-                <span className="maintenance-label">Monthly Maintenance</span>
+                <span className="maintenance-label">{t('firm.monthly_maintenance')}</span>
                 <span className="maintenance-value">${(maintenanceCost / 100).toLocaleString()}</span>
               </div>
               <div className="maintenance-item">
-                <span className="maintenance-label">Last Service</span>
-                <span className="maintenance-value">{buildingAge} ticks ago</span>
+                <span className="maintenance-label">{t('firm.last_service')}</span>
+                <span className="maintenance-value">{t('firm.ticks_ago', { count: buildingAge })}</span>
               </div>
               <div className="maintenance-item">
-                <span className="maintenance-label">Condition Impact</span>
+                <span className="maintenance-label">{t('firm.condition_impact')}</span>
                 <span className={`maintenance-impact ${buildingHealth < 50 ? 'negative' : ''}`}>
-                  {buildingHealth < 30 ? '-15% efficiency' : buildingHealth < 50 ? '-10% efficiency' : buildingHealth < 70 ? '-5% efficiency' : 'Optimal'}
+                  {buildingHealth < 30 ? t('firm.efficiency_penalty', { pct: 15 }) : buildingHealth < 50 ? t('firm.efficiency_penalty', { pct: 10 }) : buildingHealth < 70 ? t('firm.efficiency_penalty', { pct: 5 }) : t('firm.optimal')}
                 </span>
               </div>
             </div>
@@ -500,21 +581,21 @@ export function FirmDetailPanel({
               <span className="alert-icon">⚠️</span>
               <span className="alert-text">
                 {buildingHealth < 40 
-                  ? 'Critical condition! Maintenance required immediately.' 
-                  : 'Building condition declining. Consider maintenance.'}
+                  ? t('firm.health_alert_critical') 
+                  : t('firm.health_alert_declining')}
               </span>
             </div>
           )}
         </section>
 
         <section className="firm-section">
-          <h3>INVENTORY & SUPPLY</h3>
+          <h3>{t('firm.inventory_supply')}</h3>
           
           <div className="inventory-section">
-            <h4>Output Storage</h4>
-            {productId === 0 ? (
-                 <div className="no-data">Empty</div>
-            ) : (
+            <h4>{t('firm.output_storage')}</h4>
+             {productId === 0 ? (
+                 <div className="no-data">{t('firm.empty')}</div>
+             ) : (
                 <div className="inventory-card">
                     <span className="product-name">{productData?.name}</span>
                     <span className="stock-counter">{currentStock} / {stockCapacity}</span>
@@ -523,7 +604,18 @@ export function FirmDetailPanel({
           </div>
 
           <div className="supply-chain-section">
-            <h4>{isRetail ? "Sales Units" : "Input Supplies"}</h4>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '10px' }}>
+              <h4 style={{ margin: 0 }}>{isRetail ? t('firm.sales_units') : t('firm.input_supplies')}</h4>
+              {isFactory && recipeId !== 0 && (
+                <button 
+                  className="change-btn" 
+                  style={{ background: 'rgba(59, 130, 246, 0.2)', border: '1px solid rgba(59, 130, 246, 0.5)', color: '#60a5fa' }}
+                  onClick={handleAutoLink}
+                >
+                  {t('firm.auto_link', { defaultValue: '⚡ Auto-Link' })}
+                </button>
+              )}
+            </div>
             {/* Render slots based on context */}
             {(() => {
                 const recipeId = Factory.recipeId[entityId];
@@ -549,20 +641,20 @@ export function FirmDetailPanel({
 
         {isFactory && (
           <section className="firm-section production-section">
-            <h3>PRODUCTION</h3>
+            <h3>{t('firm.production')}</h3>
             {recipeId === 0 ? (
                 <div className="rd-empty" onClick={() => setShowProductSelector(true)}>
                     <span className="plus">+</span>
-                    <span>Select Product to Manufacture</span>
+                    <span>{t('firm.select_product_manufacture')}</span>
                 </div>
             ) : (
                 <div className="rd-active">
                      <div className="rd-info" onClick={() => setShowProductSelector(true)}>
                         <span className="rd-name">
-                          🏭 Producing: {world.dataStore.getProduct(Inventory.productId[entityId])?.name}
+                          🏭 {t('firm.producing')}: {world.dataStore.getProduct(Inventory.productId[entityId])?.name}
                         </span>
                     </div>
-                     <button className="change-btn" onClick={() => setShowProductSelector(true)}>CHANGE PRODUCT</button>
+                     <button className="change-btn" onClick={() => setShowProductSelector(true)}>{t('firm.change_product')}</button>
                 </div>
             )}
           </section>
@@ -570,19 +662,19 @@ export function FirmDetailPanel({
 
         {isRD && (
           <section className="firm-section rd-section">
-            <h3>RESEARCH & DEVELOPMENT</h3>
+            <h3>{t('firm.research_development')}</h3>
             {researchingProductId === 0 ? (
                 <div className="rd-empty" onClick={() => setShowProductSelector(true)}>
                     <span className="plus">+</span>
-                    <span>Select Product to Research</span>
+                    <span>{t('firm.select_product_research')}</span>
                 </div>
             ) : (
                 <div className="rd-active">
                     <div className="rd-info" onClick={() => setShowProductSelector(true)}>
                         <span className="rd-name">
-                          🔬 Researching: {world.dataStore.getProduct(researchingProductId)?.name}
+                          🔬 {t('firm.researching')}: {world.dataStore.getProduct(researchingProductId)?.name}
                         </span>
-                        <span className="rd-level">Current Tech: {currentTechLevel}</span>
+                        <span className="rd-level">{t('firm.current_tech')}: {currentTechLevel}</span>
                     </div>
                     <div className="rd-progress">
                         <div className="rd-bar">
@@ -590,7 +682,7 @@ export function FirmDetailPanel({
                         </div>
                         <span className="rd-pct">{rdProgress}%</span>
                     </div>
-                    <button className="change-btn" onClick={() => setShowProductSelector(true)}>CHANGE PROJECT</button>
+                    <button className="change-btn" onClick={() => setShowProductSelector(true)}>{t('firm.change_project')}</button>
                 </div>
             )}
           </section>
@@ -598,20 +690,20 @@ export function FirmDetailPanel({
 
         {isMarketing && (
           <section className="firm-section marketing-section">
-            <h3>MARKETING & ADVERTISING</h3>
+            <h3>{t('firm.marketing_advertising')}</h3>
             {marketingProdId === 0 ? (
                 <div className="rd-empty" onClick={() => setShowProductSelector(true)}>
                     <span className="plus">+</span>
-                    <span>Select Product to Advertise</span>
+                    <span>{t('firm.select_product_advertise')}</span>
                 </div>
             ) : (
                 <div className="rd-active">
                     <div className="rd-info" onClick={() => setShowProductSelector(true)}>
                         <span className="rd-name">
-                          📢 Advertising: {world.dataStore.getProduct(marketingProdId)?.name}
+                          📢 {t('firm.advertising')}: {world.dataStore.getProduct(marketingProdId)?.name}
                         </span>
                         <div className="budget-control">
-                            <span className="label">Monthly Budget:</span>
+                            <span className="label">{t('firm.monthly_budget')}:</span>
                             <input 
                                 type="range" 
                                 min="0" 
@@ -627,13 +719,13 @@ export function FirmDetailPanel({
                         </div>
                     </div>
                     <div className="rd-progress">
-                        <span className="label">Brand Awareness</span>
+                        <span className="label">{t('firm.brand_awareness')}</span>
                         <div className="rd-bar">
                             <div className="rd-fill awareness" style={{ width: `${currentAwareness}%` }}></div>
                         </div>
                         <span className="rd-pct">{Math.floor(currentAwareness)}%</span>
                     </div>
-                    <button className="change-btn" onClick={() => setShowProductSelector(true)}>CHANGE CAMPAIGN</button>
+                    <button className="change-btn" onClick={() => setShowProductSelector(true)}>{t('firm.change_campaign')}</button>
                 </div>
             )}
           </section>
@@ -644,7 +736,7 @@ export function FirmDetailPanel({
         <div className="source-selector-overlay">
           <div className="selector-content">
             <div className="selector-header">
-              <h4>SELECT PROJECT</h4>
+              <h4>{t('firm.select_project')}</h4>
               <button onClick={() => setShowProductSelector(false)}>×</button>
             </div>
             <div className="selector-list">
@@ -689,7 +781,7 @@ export function FirmDetailPanel({
                             <span className="supplier-name">{p.name}</span>
                             <span className="supplier-prod">{p.category}</span>
                         </div>
-                        <button className="select-btn">SELECT</button>
+                        <button className="select-btn">{t('common.select') || 'SELECT'}</button>
                     </div>
                 ))}
             </div>
@@ -701,14 +793,14 @@ export function FirmDetailPanel({
         <div className="source-selector-overlay">
           <div className="selector-content">
             <div className="selector-header">
-              <h4>SELECT SOURCE (Slot {selectingSourceSlot})</h4>
+              <h4>{t('firm.select_source')} (Slot {selectingSourceSlot})</h4>
               <button onClick={() => setSelectingSourceSlot(null)}>×</button>
             </div>
             <div className="selector-list">
               {(() => {
                   const suppliers = getPotentialSuppliers(selectingSourceSlot);
                   if (suppliers.length === 0) {
-                      return <div className="no-suppliers">No potential suppliers found.</div>;
+                      return <div className="no-suppliers">{t('firm.no_suppliers_found')}</div>;
                   }
                   return suppliers.map(sid => {
                     const sTypeId = Building.buildingTypeId[sid];
@@ -716,15 +808,15 @@ export function FirmDetailPanel({
                     const sProdId = Inventory.productId[sid];
                     const sProdData = world.dataStore.getProduct(sProdId);
                     
-                    return (
-                        <div key={sid} className="supplier-item" onClick={() => handleLinkSource(sid)}>
-                        <div className="supplier-meta">
-                            <span className="supplier-name">{sData?.name} (#{sid})</span>
-                            <span className="supplier-prod">Stocking: {sProdData?.name}</span>
-                        </div>
-                        <button className="select-btn">LINK</button>
-                        </div>
-                    );
+                     return (
+                         <div key={sid} className="supplier-item" onClick={() => handleLinkSource(sid)}>
+                         <div className="supplier-meta">
+                             <span className="supplier-name">{sData?.name} (#{sid})</span>
+                             <span className="supplier-prod">{t('firm.stocking')}: {sProdData?.name}</span>
+                         </div>
+                         <button className="select-btn">{t('common.link') || 'LINK'}</button>
+                         </div>
+                     );
                   });
               })()}
             </div>
@@ -733,25 +825,25 @@ export function FirmDetailPanel({
       )}
 
       <div className="firm-footer">
-        <button 
+        <button
           className={`firm-action-btn secondary ${!isOperational ? 'stopped' : ''}`}
           onClick={() => onToggleOperational?.(entityId)}
         >
-          {isOperational ? 'Stop Operations' : 'Start Operations'}
+          {isOperational ? t('firm.stop_operations') : t('firm.start_operations')}
         </button>
         {(() => {
             const upgradeCost = Math.floor(buildingData.baseCost * Math.pow(1.2, level - 1));
             const canAfford = world.cash >= upgradeCost;
 
             return (
-              <button 
+              <button
                 className={`firm-action-btn primary ${!canAfford ? 'disabled' : ''}`}
                 onClick={() => canAfford && onUpgrade?.(entityId)}
                 disabled={!canAfford}
-                title={!canAfford ? 'Insufficient funds' : 'Upgrade capacity'}
+                title={!canAfford ? t('firm.insufficient_funds') : t('firm.upgrade_capacity')}
               >
                 <div className="btn-content-col">
-                  <span>Upgrade Firm</span>
+                  <span>{t('firm.upgrade_firm')}</span>
                   <span className="btn-cost" style={{ fontSize: '0.8em', opacity: 0.8 }}>
                     ${upgradeCost.toLocaleString()}
                   </span>

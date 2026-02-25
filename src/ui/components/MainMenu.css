@@ -177,20 +177,18 @@
   align-items: center;
   gap: var(--spacing-md);
   padding: var(--spacing-md) var(--spacing-lg);
-  background: linear-gradient(
-    145deg,
-    rgba(22, 33, 62, 0.8) 0%,
-    rgba(26, 26, 46, 0.8) 100%
-  );
-  border: 2px solid rgba(255, 255, 255, 0.1);
+  background: rgba(30, 41, 59, 0.45);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  box-shadow: 0 4px 24px rgba(0, 0, 0, 0.25);
   border-radius: var(--radius-lg);
   color: var(--color-text-primary);
   cursor: pointer;
-  transition: all var(--transition-normal);
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
   text-align: left;
   position: relative;
   overflow: hidden;
-  backdrop-filter: blur(10px);
 }
 
 .menu-button::before {
