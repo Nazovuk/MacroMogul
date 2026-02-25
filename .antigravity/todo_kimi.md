@@ -35,8 +35,8 @@
 - [x] Load Game modal'ı ekleme
 
 ## Sonraki Adımlar
-1. IsometricMap.tsx analiz et
-2. ECS Entity -> Isometric Rendering köprüsünü kur
-3. Şehir içi bina yerleşimini görselleştir
+- [x] IsometricMap.tsx analiz et
+- [x] ECS Entity -> Isometric Rendering köprüsünü kur
+- [x] Şehir içi bina yerleşimini görselleştir
 
-**Son Güncelleme:** 2026-02-20
+**Son Güncelleme:** 2026-02-25

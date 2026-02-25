@@ -287,22 +287,53 @@ export class RenderingSystem {
     let visual = this.visuals.get(entityId)
     if (!visual) {
       const container = new Container()
+      container.sortableChildren = true
       
-      // City buildings cluster
-      // Render one large building and potentially some smaller ones around it
-      const texture = TextureManager.getBuildingTexture('OFFICE')
-      if (texture) {
-        const sprite = new Sprite(texture)
-        sprite.anchor.set(0.5, 0.95)
-        sprite.scale.set(1.4)
-        container.addChild(sprite)
-      }
-
-      // Add City Name Label
       const cityIdx = Position.cityId[entityId] - 1
       const cityData = CITIES[cityIdx]
       const cityName = cityData ? cityData.name : `City ${Position.cityId[entityId]}`
-      
+      const baseSeed = 1000 + cityIdx * 7
+
+      // Procedural City Cluster Generation
+      // 1. Center piece (Skyscraper)
+      const centerTex = TextureManager.getBuildingTexture('OFFICE')
+      if (centerTex) {
+        const centerSprite = new Sprite(centerTex)
+        centerSprite.anchor.set(0.5, 0.95)
+        centerSprite.scale.set(1.4)
+        centerSprite.zIndex = 10 // Highest priority in cluster
+        container.addChild(centerSprite)
+      }
+
+      // 2. Surrounding urban sprawl
+      const sprawlCount = 6 + Math.floor(hash(baseSeed, 1, 1) * 6) // 6 to 11 buildings
+      for (let i = 0; i < sprawlCount; i++) {
+        const typeHash = hash(baseSeed, i, 2)
+        const cat = typeHash < 0.3 ? 'RESIDENTIAL' : (typeHash < 0.7 ? 'RETAIL' : 'OFFICE')
+        const tex = TextureManager.getBuildingTexture(cat) || centerTex
+        
+        if (tex) {
+           const sp = new Sprite(tex)
+           sp.anchor.set(0.5, 0.95)
+           
+           // Random isometric offset
+           const mapOffsetX = (hash(baseSeed, i, 3) - 0.5) * 8
+           const mapOffsetY = (hash(baseSeed, i, 4) - 0.5) * 8
+           
+           // Convert local map offset to local screen offset
+           const screenOff = this.mapToScreen(mapOffsetX, mapOffsetY)
+           sp.x = screenOff.x
+           sp.y = screenOff.y
+           
+           // Scale varies, smaller than main
+           sp.scale.set(0.7 + hash(baseSeed, i, 5) * 0.4)
+           sp.zIndex = mapOffsetX + mapOffsetY // proper isometric overlap within cluster
+           
+           container.addChild(sp)
+        }
+      }
+
+      // Add City Name Label
       const style = new TextStyle({
         fontFamily: 'Outfit, Inter, sans-serif',
         fontSize: 16,
@@ -318,7 +349,8 @@ export class RenderingSystem {
       } as any)
       
       const label = new Text({ text: cityName.toUpperCase(), style })
-      label.anchor.set(0.5, 3.8) // Higher above the "main" building
+      label.anchor.set(0.5, 4.5) // Higher above the cluster
+      label.zIndex = 100 // Always on top of its own cluster
       container.addChild(label)
 
       this.entityLayer.addChild(container)
