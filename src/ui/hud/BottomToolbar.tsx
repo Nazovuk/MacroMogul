@@ -7,13 +7,15 @@ interface BottomToolbarProps {
   onManagement: () => void;
   onMapOverlay: () => void;
   onWorldMap: () => void;
+  onRoadMode: () => void;
 }
 
 export function BottomToolbar({ 
   onBuildMenu, 
   onManagement, 
   onMapOverlay, 
-  onWorldMap 
+  onWorldMap,
+  onRoadMode
 }: BottomToolbarProps) {
   const { t } = useTranslation();
   const [activeMenu, setActiveMenu] = useState<string | null>(null);
@@ -54,6 +56,15 @@ export function BottomToolbar({
       color: '#e94560',
       shortcut: 'W',
       onClick: onWorldMap,
+    },
+    {
+      id: 'road',
+      icon: '🛣️',
+      label: t('menu.road', { defaultValue: 'Yol Yap' }),
+      description: t('menu.road_desc', { defaultValue: 'Bağlantı kur' }),
+      color: '#888888',
+      shortcut: 'R',
+      onClick: onRoadMode,
     },
   ];
 

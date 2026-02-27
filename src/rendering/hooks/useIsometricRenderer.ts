@@ -15,7 +15,7 @@ import { GameWorld, createBuilding } from '../../core/ecs/world'
 import { RenderingSystem } from '../systems/RenderingSystem'
 import { CameraController } from '../CameraController'
 import { TextureManager } from '../TextureManager'
-import { addComponent, addEntity } from 'bitecs'
+import { addComponent, addEntity, removeEntity } from 'bitecs'
 import {
   Position,
   Renderable,
@@ -38,6 +38,7 @@ interface UseIsometricRendererOptions {
   mapHeight?: number
   selectedBuildingToBuild: BuildingData | null
   activeOverlay: string | null
+  roadPlacementMode?: boolean
   onPlaced?: () => void
   onSelectEntity?: (entityId: number | null) => void
 }
@@ -47,6 +48,8 @@ interface UseIsometricRendererReturn {
   isInitialized: boolean
   renderingSystem: RenderingSystem | null
   camera: CameraController | null
+  hoveredEntity: number | null
+  mousePosition: { x: number, y: number }
 }
 
 // ━━━━ HOOK ━━━━
@@ -62,6 +65,7 @@ export function useIsometricRenderer(
     mapHeight = 40,
     selectedBuildingToBuild,
     activeOverlay,
+    roadPlacementMode = false,
     onPlaced,
     onSelectEntity,
   } = options
@@ -72,8 +76,17 @@ export function useIsometricRenderer(
   const cameraRef = useRef<CameraController | null>(null)
   const animationFrameRef = useRef<number | null>(null)
   const blueprintEntityRef = useRef<number | null>(null)
+  
+  // Refs for callbacks to avoid stale closures in PixiJS event handlers
+  const createBuildingAtRef = useRef<((x: number, y: number, typeId: number) => number | null) | null>(null)
+  const onPlacedRef = useRef(onPlaced)
+  const onSelectEntityRef = useRef(onSelectEntity)
+  const roadPlacementModeRef = useRef(roadPlacementMode)
+  const roadPaintingRef = useRef(false) // true when mouse is down in road mode
 
   const [isInitialized, setIsInitialized] = useState(false)
+  const [hoveredEntity, setHoveredEntity] = useState<number | null>(null)
+  const [mousePosition, setMousePosition] = useState({ x: 0, y: 0 })
 
   // ━━━━ CREATE BUILDING AT MAP COORDS ━━━━
   const createBuildingAt = useCallback(
@@ -120,6 +133,11 @@ export function useIsometricRenderer(
     [world, mapWidth, mapHeight],
   )
 
+  // Keep refs up to date
+  createBuildingAtRef.current = createBuildingAt
+  onPlacedRef.current = onPlaced
+  onSelectEntityRef.current = onSelectEntity
+
   // ━━━━ BLUEPRINT ENTITY LIFECYCLE ━━━━
   useEffect(() => {
     if (!isInitialized || !world) return
@@ -141,6 +159,13 @@ export function useIsometricRenderer(
       EntityType.kind[entity] = EntityKind.Building
 
       blueprintEntityRef.current = entity
+
+      // Auto-center camera back to map when entering build mode so the user isn't lost in the void
+      if (cameraRef.current && renderingSystemRef.current) {
+         const centerTile = renderingSystemRef.current.mapToScreen(mapWidth / 2, mapHeight / 2)
+         // Check if camera is too far away, and jump. We can just pan it there quickly
+         cameraRef.current.setPosition(centerTile.x, centerTile.y)
+      }
     } else if (!selectedBuildingToBuild && blueprintEntityRef.current !== null) {
       Renderable.visible[blueprintEntityRef.current] = 0
       blueprintEntityRef.current = null
@@ -149,6 +174,11 @@ export function useIsometricRenderer(
       Building.buildingTypeId[blueprintEntityRef.current] = selectedBuildingToBuild.id
     }
   }, [selectedBuildingToBuild, isInitialized, world])
+
+  // Sync road placement mode ref
+  useEffect(() => {
+    roadPlacementModeRef.current = roadPlacementMode
+  }, [roadPlacementMode])
 
   // ━━━━ WORLD SYNC ━━━━
   useEffect(() => {
@@ -188,7 +218,7 @@ export function useIsometricRenderer(
         appRef.current = app
 
         // 2. Texture generation
-        await TextureManager.initialize(app.renderer as Renderer, true)
+        await TextureManager.initialize(app.renderer as Renderer, false)
 
         // 3. Map container (the world that camera moves)
         const mapContainer = new Container()
@@ -203,18 +233,18 @@ export function useIsometricRenderer(
         renderingSystemRef.current = renderingSystem
         renderingSystem.initializeMap(mapWidth, mapHeight, undefined, world.seed)
 
-        // 5. Camera Controller
+        // 5. Camera Controller — expanded for 60×60 map
         const camera = new CameraController(
           mapContainer,
           new Rectangle(0, 0, width, height),
-          { minZoom: 0.4, maxZoom: 2.5, zoomSpeed: 0.1, panSpeed: 1, inertia: 0.92 },
+          { minZoom: 0.15, maxZoom: 3.0, zoomSpeed: 0.08, panSpeed: 1.2, inertia: 0.92 },
         )
         cameraRef.current = camera
 
         // Center on map middle: tile (mapW/2, mapH/2)
         const centerTile = renderingSystem.mapToScreen(mapWidth / 2, mapHeight / 2)
         camera.setPosition(centerTile.x, centerTile.y)
-        camera.setZoom(0.7)
+        camera.setZoom(0.45) // Start zoomed out to see the full map
 
         // 6. Keyboard interaction
         const handleKeyDown = (e: KeyboardEvent) => {
@@ -222,22 +252,55 @@ export function useIsometricRenderer(
         }
         window.addEventListener('keydown', handleKeyDown)
 
-        // 7. Mouse move → update blueprint position
-        app.stage.on('mousemove', (e: FederatedPointerEvent) => {
-          if (blueprintEntityRef.current === null) return
-          const coords = renderingSystem.getMapCoordinatesAt(e.global.x, e.global.y)
-          if (coords && coords.x >= 0 && coords.x < mapWidth && coords.y >= 0 && coords.y < mapHeight) {
-            Position.x[blueprintEntityRef.current] = coords.x
-            Position.y[blueprintEntityRef.current] = coords.y
-            Renderable.visible[blueprintEntityRef.current] = 1
+        // 7. Mouse move → update blueprint position, hover state, or paint roads
+        app.stage.on('pointermove', (e: FederatedPointerEvent) => {
+          setMousePosition({ x: e.global.x, y: e.global.y })
+          
+          if (!renderingSystemRef.current) return
 
-            // Show highlight
-            const tileType = renderingSystem.getTileType(coords.x, coords.y)
-            const canBuild = tileType !== null && tileType !== 'water'
-            renderingSystem.highlightTile(coords.x, coords.y, canBuild ? 0x00ffcc : 0xff4444)
+          const coords = renderingSystemRef.current.getMapCoordinatesAt(e.global.x, e.global.y)
+          
+          if (coords && coords.x >= 0 && coords.x < mapWidth && coords.y >= 0 && coords.y < mapHeight) {
+            // Road painting mode: paint while dragging
+            // Footprint Logic: Multi-tile shadowing before placement
+            const getName = () => selectedBuildingToBuild?.name.toLowerCase() || ''
+            const getFootprintSize = () => {
+              if (getName().includes('farm')) return 3.0 // 3x3 tiles
+              if (getName().includes('factory')) return 4.0 // 4x4 for factories
+              if (getName().includes('mine')) return 3.0 // 3x3 for mines
+              if (getName().includes('warehouse')) return 2.0 // 2x2
+              return 1.2 // Small buildings
+            }
+            const size = getFootprintSize()
+
+            if (roadPlacementModeRef.current) {
+              renderingSystemRef.current.highlightTile(coords.x, coords.y, 0x888888)
+              if (roadPaintingRef.current) {
+                renderingSystemRef.current.setTileType(coords.x, coords.y, 'road' as any)
+              }
+              setHoveredEntity(null)
+              return
+            }
+            
+            // Check for hovered building
+            const foundId = renderingSystemRef.current.getBuildingAt(coords.x, coords.y)
+            setHoveredEntity(foundId)
+
+            if (blueprintEntityRef.current !== null) {
+              Position.x[blueprintEntityRef.current] = coords.x
+              Position.y[blueprintEntityRef.current] = coords.y
+              Renderable.visible[blueprintEntityRef.current] = 1
+
+              // Show full-footprint highlight color based on validity
+              const hitBounds = renderingSystemRef.current.canPlaceBuilding(coords.x, coords.y, size, blueprintEntityRef.current)
+              renderingSystemRef.current.highlightTile(coords.x, coords.y, hitBounds ? 0x00ffcc : 0xff4444, size)
+            }
           } else {
-            Renderable.visible[blueprintEntityRef.current] = 0
-            renderingSystem.clearHighlight()
+            setHoveredEntity(null)
+            if (blueprintEntityRef.current !== null) {
+              Renderable.visible[blueprintEntityRef.current] = 0
+              renderingSystemRef.current.clearHighlight()
+            }
           }
         })
 
@@ -251,21 +314,46 @@ export function useIsometricRenderer(
 
           if (!coords || coords.x < 0 || coords.x >= mapWidth || coords.y < 0 || coords.y >= mapHeight) {
             console.log(`[PointerDown] Out of bounds`);
-            if (onSelectEntity) onSelectEntity(null)
+            if (onSelectEntityRef.current) onSelectEntityRef.current(null)
+            return
+          }
+
+          // Road placement mode
+          if (roadPlacementModeRef.current) {
+            roadPaintingRef.current = true
+            renderingSystemRef.current.setTileType(coords.x, coords.y, 'road' as any)
             return
           }
 
           if (blueprintEntityRef.current !== null) {
             // PLACEMENT MODE
-            const tileType = renderingSystemRef.current.getTileType(coords.x, coords.y)
-            if (tileType === 'water') {
-              console.warn(`[Placement] Cannot build on water at (${coords.x}, ${coords.y})`)
+            const getName = () => selectedBuildingToBuild?.name.toLowerCase() || ''
+            const getFootprintSize = () => {
+              if (getName().includes('farm')) return 3.0
+              if (getName().includes('factory')) return 4.0
+              if (getName().includes('mine')) return 3.0
+              if (getName().includes('warehouse')) return 2.0
+              return 1.2
+            }
+            
+            if (!renderingSystemRef.current.canPlaceBuilding(coords.x, coords.y, getFootprintSize(), blueprintEntityRef.current)) {
+              console.warn(`[Placement] Blocked placement at (${coords.x}, ${coords.y}). Terrain invalid or footprint blocked.`)
               return
             }
 
             const currentTypeId = Renderable.spriteId[blueprintEntityRef.current]
-            createBuildingAt(coords.x, coords.y, currentTypeId)
-            if (onPlaced) onPlaced()
+            
+            // ⚠️ CRITICAL: Remove blueprint entity BEFORE creating the real building.
+            // The blueprint sits at the same tile coordinates → createBuilding()'s
+            // overlap check sees it and returns undefined, silently failing.
+            const blueprintId = blueprintEntityRef.current
+            renderingSystemRef.current.removeEntityVisual(blueprintId)
+            removeEntity(world.ecsWorld, blueprintId)
+            blueprintEntityRef.current = null
+            
+            const newEntity = createBuildingAtRef.current?.(coords.x, coords.y, currentTypeId)
+            console.log(`[Placement] Created entity ${newEntity} at (${coords.x},${coords.y}) typeId=${currentTypeId}`)
+            if (onPlacedRef.current) onPlacedRef.current()
           } else {
             // SELECTION MODE
             // Scan for an entity at these coordinates via the system's spatial index (or robust iteration)
@@ -278,11 +366,19 @@ export function useIsometricRenderer(
               console.log(`[Selection] No building found at (${coords.x},${coords.y})`);
             }
             
-            if (onSelectEntity) onSelectEntity(foundId)
+            if (onSelectEntityRef.current) onSelectEntityRef.current(foundId)
           }
         })
 
-        // 9. Animation loop
+        // 9. Pointer Up → Stop road painting
+        app.stage.on('pointerup', () => {
+          roadPaintingRef.current = false
+        })
+        app.stage.on('pointerupoutside', () => {
+          roadPaintingRef.current = false
+        })
+
+        // 10. Animation Loop
         let lastTime = performance.now()
         const animate = (currentTime: number) => {
           if (destroyed) return
@@ -339,6 +435,8 @@ export function useIsometricRenderer(
     isInitialized,
     renderingSystem: renderingSystemRef.current,
     camera: cameraRef.current,
+    hoveredEntity,
+    mousePosition,
   }
 }
 

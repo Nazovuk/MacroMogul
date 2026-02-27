@@ -51,10 +51,10 @@ export class CameraController {
       panSpeed: options.panSpeed ?? 1,
       inertia: options.inertia ?? 0.9,
       bounds: options.bounds ?? {
-        minX: -2000,
-        maxX: 2000,
-        minY: -2000,
-        maxY: 2000,
+        minX: -5000,
+        maxX: 5000,
+        minY: -5000,
+        maxY: 5000,
       },
     }
 
@@ -79,12 +79,16 @@ export class CameraController {
       if (!this.isDragging) return
 
       const currentPos = new Point(e.global.x, e.global.y)
-      const deltaX = (currentPos.x - this.lastPointerPosition.x) * this.options.panSpeed
-      const deltaY = (currentPos.y - this.lastPointerPosition.y) * this.options.panSpeed
+      const deltaX = (currentPos.x - this.lastPointerPosition.x)
+      const deltaY = (currentPos.y - this.lastPointerPosition.y)
+
+      // Natural Panning: We move the CAMERA in the OPPOSITE direction of the drag to make the WORLD follow the mouse.
+      const worldDeltaX = deltaX / this.zoom
+      const worldDeltaY = deltaY / this.zoom
 
       this.velocity.set(deltaX, deltaY)
-      this.targetPosition.x += deltaX / this.zoom
-      this.targetPosition.y += deltaY / this.zoom
+      this.targetPosition.x -= worldDeltaX
+      this.targetPosition.y -= worldDeltaY
 
       this.lastPointerPosition = currentPos
     })
@@ -104,7 +108,7 @@ export class CameraController {
     this.container.on('wheel', (e: WheelEvent) => {
       e.preventDefault()
       
-      const zoomDelta = e.deltaY > 0 ? -this.options.zoomSpeed : this.options.zoomSpeed
+      const zoomDelta = e.deltaY > 0 ? -this.options.zoomSpeed * this.targetZoom : this.options.zoomSpeed * this.targetZoom
       const newZoom = Math.max(
         this.options.minZoom,
         Math.min(this.options.maxZoom, this.targetZoom + zoomDelta)
@@ -112,14 +116,21 @@ export class CameraController {
 
       // Zoom towards mouse pointer
       if (newZoom !== this.targetZoom) {
-        const mouseX = e.offsetX - this.viewport.width / 2
-        const mouseY = e.offsetY - this.viewport.height / 2
-
-        // Adjust position to zoom towards mouse
-        const zoomRatio = newZoom / this.targetZoom
-        this.targetPosition.x += mouseX * (1 - 1 / zoomRatio) / newZoom
-        this.targetPosition.y += mouseY * (1 - 1 / zoomRatio) / newZoom
+        // Find world coordinates of mouse before zoom
+        const mouseWorldBefore = this.screenToWorld(e.clientX, e.clientY)
+        
         this.targetZoom = newZoom
+
+        // Find where that world point is after zoom logic (roughly)
+        // To keep the world point at the same screen point:
+        // ScreenPos = (WorldPos + CamPos) * Zoom + ViewHalf
+        // So CamPos = (ScreenPos - ViewHalf) / Zoom - WorldPos
+        
+        const nextCamX = (e.clientX - this.viewport.width / 2) / newZoom - mouseWorldBefore.x
+        const nextCamY = (e.clientY - this.viewport.height / 2) / newZoom - mouseWorldBefore.y
+        
+        this.targetPosition.x = nextCamX
+        this.targetPosition.y = nextCamY
       }
     })
 
@@ -135,15 +146,10 @@ export class CameraController {
   private clampPosition(pos: Point): Point {
     const { bounds } = this.options
     
-    // Adjust bounds based on zoom level
-    const adjustedMinX = bounds.minX / this.zoom
-    const adjustedMaxX = bounds.maxX / this.zoom
-    const adjustedMinY = bounds.minY / this.zoom
-    const adjustedMaxY = bounds.maxY / this.zoom
-
+    // Bounds clamping: targetPosition is the center of the camera in world coordinates
     return new Point(
-      Math.max(adjustedMinX, Math.min(adjustedMaxX, pos.x)),
-      Math.max(adjustedMinY, Math.min(adjustedMaxY, pos.y))
+      Math.max(bounds.minX, Math.min(bounds.maxX, pos.x)),
+      Math.max(bounds.minY, Math.min(bounds.maxY, pos.y))
     )
   }
 
@@ -153,8 +159,8 @@ export class CameraController {
   update(deltaTime: number = 1/60) {
     // Apply inertia when not dragging
     if (!this.isDragging) {
-      this.targetPosition.x += this.velocity.x / this.zoom
-      this.targetPosition.y += this.velocity.y / this.zoom
+      this.targetPosition.x -= (this.velocity.x / this.zoom) * 0.1
+      this.targetPosition.y -= (this.velocity.y / this.zoom) * 0.1
       
       this.velocity.x *= this.options.inertia
       this.velocity.y *= this.options.inertia

@@ -12,7 +12,7 @@
  */
 
 import { defineQuery, IWorld, hasComponent } from 'bitecs'
-import { Container, Sprite, Graphics, Rectangle } from 'pixi.js'
+import { Container, Sprite, Graphics, Rectangle, Texture } from 'pixi.js'
 import {
   Position,
   Renderable,
@@ -23,7 +23,7 @@ import {
 } from '../../core/ecs/components'
 import { Text, TextStyle } from 'pixi.js'
 import { TextureManager } from '../TextureManager'
-import { getTileFromNoise, fbm, hash, TILE_WIDTH, TILE_HEIGHT, TILE_DEPTH } from '@/rendering/utils'
+import { getTileFromNoise, fbm, hash, TILE_WIDTH, TILE_HEIGHT } from '@/rendering/utils'
 import type { TileType } from '@/rendering/utils'
 // DataStore removed
 import type { GameDataStore } from '../../core/data/types'
@@ -37,6 +37,7 @@ export type { TileType }
 export interface EntityVisual {
   entityId: number
   sprite: Container
+  shadowSprite?: Sprite // Dynamic shadow mapping
   screenX: number
   screenY: number
   buildingCategory: string | null   // track category to detect changes
@@ -53,6 +54,8 @@ export class RenderingSystem {
 
   private tileLayer: Container
   private treeLayer: Container
+  private shadowLayer: Container // Added
+  private cloudLayer: Container  // Added for atmospheric depth
   private highlightLayer: Container
   private overlayContainer: Container
   private entityLayer: Container
@@ -81,7 +84,6 @@ export class RenderingSystem {
     this.dataStore = dataStore ?? null
     this.mapContainer = mapContainer
     this.mapContainer.sortableChildren = true
-    this.mapContainer.eventMode = 'static'
     this.mapContainer.hitArea = new Rectangle(-10000, -10000, 20000, 20000)
 
     this.tileLayer = new Container()
@@ -93,6 +95,15 @@ export class RenderingSystem {
     this.treeLayer.zIndex = 500
     this.treeLayer.sortableChildren = true
     this.mapContainer.addChild(this.treeLayer)
+
+    this.shadowLayer = new Container() // Added
+    this.shadowLayer.zIndex = 1500 // Added, below entities but above trees
+    this.mapContainer.addChild(this.shadowLayer) // Added
+
+    this.cloudLayer = new Container()
+    this.cloudLayer.zIndex = 5000 // High altitude
+    this.cloudLayer.alpha = 0.4
+    this.mapContainer.addChild(this.cloudLayer)
 
     this.overlayContainer = new Container()
     this.overlayContainer.zIndex = 1000
@@ -124,9 +135,13 @@ export class RenderingSystem {
     this.renderableQuery = defineQuery([Position, Renderable, Isometric]) 
     
     // Clear existing visuals for a truly new world
-    this.visuals.forEach(v => v.sprite.destroy())
+    this.visuals.forEach(v => {
+      v.sprite.destroy()
+      if (v.shadowSprite) v.shadowSprite.destroy() // Destroy shadow too
+    })
     this.visuals.clear()
     this.entityLayer.removeChildren()
+    this.shadowLayer.removeChildren() // Clear shadows
   }
 
   // ━━━━ MAP GENERATION ━━━━
@@ -146,7 +161,6 @@ export class RenderingSystem {
 
     console.log(`[RenderingSystem] Generating ${width}×${height} terrain (seed: ${seed})...`)
 
-    const canvasH = TILE_HEIGHT + TILE_DEPTH
 
     for (let x = 0; x < width; x++) {
       this.tileSprites[x] = []
@@ -162,49 +176,106 @@ export class RenderingSystem {
         const distFromCenter = Math.sqrt(dx * dx + dy * dy)
 
         const tileType = getTileFromNoise(elevation, moisture, distFromCenter, urbanNoise)
-        this.tileTypes[x][y] = tileType
+        
+        let finalTileType = tileType
+        let nearCity = false
+        let closestCityDist = Infinity
+        for (const city of CITIES) {
+          const cityMapX = Math.floor((city.x / 100) * width)
+          const cityMapY = Math.floor((city.y / 100) * height)
+          const dist = Math.sqrt((x - cityMapX) ** 2 + (y - cityMapY) ** 2)
+          if (dist < closestCityDist) closestCityDist = dist
+          
+          if (dist < 6 && tileType !== 'water') {
+             nearCity = true
+             if (dist < 2) finalTileType = 'plaza'
+             else finalTileType = 'concrete'
+             break
+          }
+        }
+        
+        if (!nearCity && closestCityDist < 10 && closestCityDist >= 6 && tileType !== 'water') {
+          if (y % 8 === 0) finalTileType = 'road'
+        }
+        
+        this.tileTypes[x][y] = finalTileType
 
-        const texture = TextureManager.getTileTexture(tileType)
+        const elevOffset = finalTileType === 'water' ? 0 : Math.floor(elevation * 40)
+        const texture = TextureManager.getTileTexture(finalTileType, elevOffset)
         if (!texture) continue
 
         const sprite = new Sprite(texture)
         const screen = this.mapToScreen(x, y)
         sprite.x = screen.x
-        sprite.y = screen.y
-        sprite.anchor.set(0.5, (TILE_HEIGHT / 2) / canvasH)
-        sprite.zIndex = x + y
-        sprite.eventMode = 'static'
+        sprite.y = screen.y - elevOffset
+        sprite.anchor.set(0.5, 1.0) 
+        // Correct sorting: higher elevations on same tile coordinate drawn later/higher
+        sprite.zIndex = (x + y) * 10 + elevOffset;
+        sprite.eventMode = 'static';
         sprite.cursor = 'pointer';
         (sprite as any).mapX = x;
-        (sprite as any).mapY = y
+        (sprite as any).mapY = y;
+        (sprite as any).elevation = elevOffset;
 
         this.tileLayer.addChild(sprite)
         this.tileSprites[x][y] = sprite
 
-        // Trees on forest/grass
-        if (tileType === 'forest' || (tileType === 'grass' && hash(x, y, seed + 999) > 0.73)) {
-          this.addTreeDecoration(x, y, seed)
+        if (finalTileType === 'forest' || (finalTileType === 'grass' && hash(x, y, seed + 999) > 0.82)) {
+          this.addTreeDecoration(x, y, seed, elevOffset)
         }
       }
     }
     console.log(`[RenderingSystem] Terrain ready: ${width * height} tiles`)
+
+    // 4. Initialize Cloud Layer Patterns
+    this.cloudLayer.removeChildren()
+    for (let i = 0; i < 8; i++) {
+        const cloudTexture = this.createCloudTexture()
+        const cloud = new Sprite(cloudTexture)
+        cloud.x = Math.random() * this.mapW * TILE_WIDTH
+        cloud.y = Math.random() * this.mapH * TILE_HEIGHT
+        cloud.alpha = 0.15 + Math.random() * 0.2
+        cloud.scale.set(2.0 + Math.random() * 2)
+        this.cloudLayer.addChild(cloud)
+    }
   }
 
-  private addTreeDecoration(x: number, y: number, seed: number) {
-    const count = this.tileTypes[x][y] === 'forest' ? 2 + Math.floor(hash(x, y, seed + 111) * 2) : 1
+  private createCloudTexture(): Texture {
+    const size = 256
+    const canvas = document.createElement('canvas')
+    canvas.width = size
+    canvas.height = size
+    const ctx = canvas.getContext('2d')!
+    
+    // Smooth blob using radical gradient
+    const grd = ctx.createRadialGradient(size/2, size/2, 0, size/2, size/2, size/2)
+    grd.addColorStop(0, 'rgba(255,255,255,0.4)')
+    grd.addColorStop(0.5, 'rgba(255,255,255,0.1)')
+    grd.addColorStop(1, 'rgba(255,255,255,0)')
+    
+    ctx.fillStyle = grd
+    ctx.beginPath()
+    ctx.arc(size/2, size/2, size/2, 0, Math.PI * 2)
+    ctx.fill()
+    
+    return Texture.from(canvas)
+  }
+
+  private addTreeDecoration(x: number, y: number, seed: number, elevOffset: number = 0) {
+    const count = this.tileTypes[x][y] === 'forest' ? 1 + Math.floor(hash(x, y, seed + 111)) : 1
     for (let t = 0; t < count; t++) {
       const variant: 'conifer' | 'leafy' = hash(x + t, y, seed + 222) > 0.5 ? 'conifer' : 'leafy'
       const tex = TextureManager.getTreeTexture(variant)
       if (!tex) continue
       const sp = new Sprite(tex)
       sp.anchor.set(0.5, 1.0)
-      const ox = (hash(x, y + t, seed + 333) - 0.5) * 16
-      const oy = (hash(x + t, y, seed + 444) - 0.5) * 8
+      const ox = (hash(x, y + t, seed + 333) - 0.5) * 10
+      const oy = (hash(x + t, y, seed + 444) - 0.5) * 5
       const screen = this.mapToScreen(x, y)
       sp.x = screen.x + ox
-      sp.y = screen.y + oy - 2
-      sp.zIndex = x + y + 1
-      sp.scale.set(0.7 + hash(x, y, seed + 555 + t) * 0.5)
+      sp.y = screen.y + oy - 2 - elevOffset
+      sp.zIndex = (x + y) * 10 + elevOffset + 1
+      sp.scale.set(0.5 + hash(x, y, seed + 555 + t) * 0.2)
       this.treeLayer.addChild(sp)
     }
   }
@@ -229,23 +300,82 @@ export class RenderingSystem {
 
   public getMapCoordinatesAt(globalX: number, globalY: number): { x: number; y: number } {
     const localPoint = this.mapContainer.toLocal({ x: globalX, y: globalY })
+    
+    // javidx9 'Height-Slicing' Algorithm
+    // We start from the maximum possible elevation and work downwards to see which tile we 'hit'.
+    // Max elevation in our system is 40.
+    const maxElev = 60;
+    
+    for (let h = maxElev; h >= 0; h -= 2) {
+      const worldX = localPoint.x;
+      const worldY = localPoint.y + h; // Adjust for the vertical height slice
+      
+      const coords = this.screenToMap(worldX, worldY);
+      
+      if (coords.x >= 0 && coords.x < this.mapW && coords.y >= 0 && coords.y < this.mapH) {
+        const actualElev = this.getElevation(coords.x, coords.y);
+        // If our slice is at or below the actual elevation of this tile, we've found our hit!
+        if (h <= actualElev) {
+          return coords;
+        }
+      }
+    }
+    
     return this.screenToMap(localPoint.x, localPoint.y)
   }
 
   // ━━━━ INTERACTION ━━━━
 
-  public highlightTile(x: number, y: number, color: number = 0xFFFFFF) {
+  public highlightTile(x: number, y: number, color: number = 0x00FFCC, size: number = 1) {
     this.highlightLayer.removeChildren()
     if (x < 0 || x >= this.mapW || y < 0 || y >= this.mapH) return
 
+    const sprite = this.tileSprites[x]?.[y]
+    const elev = (sprite as any)?.elevation || 0
     const screen = this.mapToScreen(x, y)
-    const g = new Graphics()
-      .poly([0, -TILE_HEIGHT / 2, TILE_WIDTH / 2, 0, 0, TILE_HEIGHT / 2, -TILE_WIDTH / 2, 0])
-      .stroke({ width: 2.5, color, alpha: 0.8 })
+    
+    const container = new Container()
+    container.x = screen.x
+    container.y = screen.y - elev
+
+    const halfW = (TILE_WIDTH / 2) * size
+    const halfH = (TILE_HEIGHT / 2) * size
+
+    // 1. Outer Holographic Ring (Thick, low alpha)
+    const outer = new Graphics()
+      .poly([0, -halfH - 2, halfW + 4, 0, 0, halfH + 2, -halfW - 4, 0])
+      .stroke({ width: 4, color, alpha: 0.25 })
+    container.addChild(outer)
+
+    // 2. Inner Glow (Filled, pulses)
+    const inner = new Graphics()
+      .poly([0, -halfH, halfW, 0, 0, halfH, -halfW, 0])
       .fill({ color, alpha: 0.15 })
-    g.x = screen.x
-    g.y = screen.y
-    this.highlightLayer.addChild(g)
+      .stroke({ width: 2, color, alpha: 0.9 })
+    
+    // Add a simple pulse animation
+    const startTime = Date.now()
+    const pulse = () => {
+      if (inner.destroyed) return
+      const t = (Date.now() - startTime) / 1000
+      inner.alpha = 0.6 + Math.sin(t * 8) * 0.2
+      requestAnimationFrame(pulse)
+    }
+    pulse()
+
+    container.addChild(inner)
+    
+    // 3. Corner Brackets (for that high-tech look)
+    const bracketSize = 8
+    const brackets = new Graphics()
+    // Top corner
+    brackets.moveTo(-bracketSize/2, -TILE_HEIGHT/2 - 4).lineTo(0, -TILE_HEIGHT/2 - 6).lineTo(bracketSize/2, -TILE_HEIGHT/2 - 4)
+    // Bottom corner
+    brackets.moveTo(-bracketSize/2, TILE_HEIGHT/2 + 4).lineTo(0, TILE_HEIGHT/2 + 6).lineTo(bracketSize/2, TILE_HEIGHT/2 + 4)
+    brackets.stroke({ width: 2, color, alpha: 1.0 })
+    container.addChild(brackets)
+
+    this.highlightLayer.addChild(container)
   }
 
   public showPlacementGhost(x: number, y: number, _type: string) {
@@ -295,39 +425,45 @@ export class RenderingSystem {
       const baseSeed = 1000 + cityIdx * 7
 
       // Procedural City Cluster Generation
-      // 1. Center piece (Skyscraper)
+      // 1. Center piece — prominent but proportional
       const centerTex = TextureManager.getBuildingTexture('OFFICE')
       if (centerTex) {
         const centerSprite = new Sprite(centerTex)
-        centerSprite.anchor.set(0.5, 0.95)
-        centerSprite.scale.set(1.4)
-        centerSprite.zIndex = 10 // Highest priority in cluster
+        centerSprite.anchor.set(0.5, 1.0)
+        // Allow up to 4 tiles tall for the main skyscraper
+        const maxHeight = TILE_HEIGHT * 4.5 // ~144px
+        const heightScale = Math.min(1.0, maxHeight / (centerTex.height || 140))
+        centerSprite.scale.set(heightScale)
+        centerSprite.zIndex = 1000
         container.addChild(centerSprite)
       }
 
-      // 2. Surrounding urban sprawl
-      const sprawlCount = 6 + Math.floor(hash(baseSeed, 1, 1) * 6) // 6 to 11 buildings
+      // 2. Surrounding urban sprawl — use SHORT building types (RETAIL, RESIDENTIAL, SUPERMARKET)
+      const sprawlTypes = ['RESIDENTIAL', 'RETAIL', 'SUPERMARKET', 'WAREHOUSE', 'RETAIL', 'RESIDENTIAL']
+      const sprawlCount = 4 + Math.floor(hash(baseSeed, 1, 1) * 3) // 4 to 6
       for (let i = 0; i < sprawlCount; i++) {
-        const typeHash = hash(baseSeed, i, 2)
-        const cat = typeHash < 0.3 ? 'RESIDENTIAL' : (typeHash < 0.7 ? 'RETAIL' : 'OFFICE')
-        const tex = TextureManager.getBuildingTexture(cat) || centerTex
+        const cat = sprawlTypes[i % sprawlTypes.length]
+        const tex = TextureManager.getBuildingTexture(cat)
         
         if (tex) {
            const sp = new Sprite(tex)
-           sp.anchor.set(0.5, 0.95)
+           sp.anchor.set(0.5, 1.0)
            
-           // Random isometric offset
-           const mapOffsetX = (hash(baseSeed, i, 3) - 0.5) * 8
-           const mapOffsetY = (hash(baseSeed, i, 4) - 0.5) * 8
+           // Spread within 1.5-tile radius
+           const angle = (i / sprawlCount) * Math.PI * 2 + hash(baseSeed, i, 3) * 0.5
+           const radius = 1.0 + hash(baseSeed, i, 4) * 1.0
+           const mapOffsetX = Math.cos(angle) * radius
+           const mapOffsetY = Math.sin(angle) * radius
            
-           // Convert local map offset to local screen offset
            const screenOff = this.mapToScreen(mapOffsetX, mapOffsetY)
            sp.x = screenOff.x
            sp.y = screenOff.y
            
-           // Scale varies, smaller than main
-           sp.scale.set(0.7 + hash(baseSeed, i, 5) * 0.4)
-           sp.zIndex = mapOffsetX + mapOffsetY // proper isometric overlap within cluster
+           // Visible height — up to 3 tiles tall for sprawl
+           const maxH = TILE_HEIGHT * 3
+           const hScale = Math.min(0.7, maxH / (tex.height || 70))
+           sp.scale.set(hScale)
+           sp.zIndex = mapOffsetX + mapOffsetY
            
            container.addChild(sp)
         }
@@ -349,26 +485,43 @@ export class RenderingSystem {
       } as any)
       
       const label = new Text({ text: cityName.toUpperCase(), style })
-      label.anchor.set(0.5, 4.5) // Higher above the cluster
-      label.zIndex = 100 // Always on top of its own cluster
+      label.anchor.set(0.5, 1.5) // Positioned above the building tops
+      label.zIndex = 2000 // Topmost label
       container.addChild(label)
+
+      // Add a small light glow under the city center
+      const glow = new Graphics().circle(0, 0, 40).fill({ color: 0x3b82f6, alpha: 0.15 })
+      glow.zIndex = 1
+      container.addChild(glow)
 
       this.entityLayer.addChild(container)
       visual = { entityId, sprite: container, screenX: 0, screenY: 0, buildingCategory: 'CITY' }
       this.visuals.set(entityId, visual)
     }
 
-    const mx = Position.x[entityId]
-    const my = Position.y[entityId]
-    const screen = this.mapToScreen(mx, my)
-    visual.sprite.position.set(screen.x, screen.y)
-    visual.sprite.zIndex = mx + my + 500 // Cities are visually prioritized
+    const mx = Position.x[entityId];
+    const my = Position.y[entityId];
+    const elev = this.getElevation(mx, my);
+    const screen = this.mapToScreen(mx, my);
+    visual.sprite.visible = true;
+    visual.sprite.position.set(screen.x, screen.y - elev);
+    visual.sprite.zIndex = mx + my + elev + 500; // Cities are visually prioritized
   }
+
+  private _debugLogThrottle = 0
 
   public update(_dt: number): number[] {
     if (!this.world) return []
     const entities = this.renderableQuery(this.world)
     const currentIds = new Set(entities)
+
+    // Diagnostic logging (throttled to once per 120 frames ≈ 2s)
+    this._debugLogThrottle++
+    if (this._debugLogThrottle % 120 === 1) {
+      const cityCount = entities.filter((id: number) => EntityType.kind[id] === EntityKind.City).length
+      const buildingCount = entities.filter((id: number) => EntityType.kind[id] === EntityKind.Building).length
+      console.log(`[RenderingSystem] Frame ${this._debugLogThrottle}: ${entities.length} renderable entities (${cityCount} cities, ${buildingCount} buildings), ${this.visuals.size} sprites`)
+    }
 
     // Remove stale visuals
     for (const [id] of this.visuals) {
@@ -394,8 +547,18 @@ export class RenderingSystem {
       this.logisticsGraphics.visible = false
     }
 
+    // 4. Atmospheric Movement (Clouds)
+    this.cloudLayer.children.forEach((c, i) => {
+        c.x += 0.2 + (i % 3) * 0.1
+        c.y += 0.1
+        if (c.x > this.mapW * TILE_WIDTH + 200) c.x = -200
+        if (c.y > this.mapH * TILE_HEIGHT + 200) c.y = -200
+    })
+
     return Array.from(entities)
   }
+
+  private _syncedEntitiesLogged = new Set<number>()
 
   private syncEntity(entityId: number) {
     if (!hasComponent(this.world, Renderable, entityId) ||
@@ -408,13 +571,25 @@ export class RenderingSystem {
     const visible = Renderable.visible[entityId]
     if (visible === 0) {
       const existing = this.visuals.get(entityId)
-      if (existing) existing.sprite.visible = false
+      if (existing) {
+        existing.sprite.visible = false
+        if (existing.shadowSprite) existing.shadowSprite.visible = false // Hide shadow too
+      }
       return
     }
 
-    const mx = Position.x[entityId]
-    const my = Position.y[entityId]
-    const category = this.resolveBuildingCategory(entityId)
+    const mx = Position.x[entityId];
+    const my = Position.y[entityId];
+    const elev = this.getElevation(mx, my);
+    const category = this.resolveBuildingCategory(entityId);
+    const kind = EntityType.kind[entityId]; // Get entity kind
+
+    // One-time debug log per entity
+    if (!this._syncedEntitiesLogged.has(entityId)) {
+      this._syncedEntitiesLogged.add(entityId)
+      const screen = this.mapToScreen(mx, my)
+      console.log(`[RenderingSystem] NEW ENTITY ${entityId}: category=${category} map=(${mx},${my}) screen=(${screen.x.toFixed(0)},${screen.y.toFixed(0)}) visible=${visible} alpha=${Renderable.alpha[entityId]}`)
+    }
 
     let visual = this.visuals.get(entityId)
 
@@ -433,7 +608,25 @@ export class RenderingSystem {
       }
 
       const sprite = new Sprite(texture)
-      sprite.anchor.set(0.5, 0.92) // Ideal for our isometric perspective
+      sprite.anchor.set(0.5, 0.9) // Sit on the foundation pad
+      
+      // --- PREMIUM SCALING (Footprint Fix) ---
+      // This MUST match the sizes in useIsometricRenderer.ts
+      const getFootprintSize = () => {
+        const cat = (category || '').toUpperCase()
+        if (cat === 'FARM') return 3.0
+        if (cat === 'FACTORY') return 4.0
+        if (cat === 'MINE') return 3.0
+        if (cat === 'WAREHOUSE') return 2.0
+        return 1.2
+      }
+      const footprintSize = getFootprintSize()
+      const desiredWidth = TILE_WIDTH * footprintSize 
+      const widthScale = desiredWidth / (texture.width || 256)
+      
+      // Let it be tall! We want impressive silos.
+      sprite.scale.set(widthScale)
+      sprite.zIndex = 10
 
       container.addChild(sprite)
       this.entityLayer.addChild(container)
@@ -441,32 +634,58 @@ export class RenderingSystem {
       const alpha = Renderable.alpha[entityId] || 1.0
       container.alpha = alpha
 
+      let shadowSprite: Sprite | undefined = undefined; // Initialize shadowSprite
+      // Add Shadow beneath building
+      if (kind === EntityKind.Building) {
+          const shadowTex = TextureManager.getTexture('building_shadow')
+          if (shadowTex) {
+              const shadow = new Sprite(shadowTex)
+              shadow.anchor.set(0.5, 0.4) // Center on base
+              shadow.alpha = 0.6
+              this.shadowLayer.addChild(shadow)
+              shadowSprite = shadow; // Assign to shadowSprite
+          }
+      }
+
       visual = { 
         entityId, 
         sprite: container, 
         screenX: 0, 
         screenY: 0, 
-        buildingCategory: category 
-      }
-      this.visuals.set(entityId, visual)
+        buildingCategory: category,
+        shadowSprite: shadowSprite // Store shadow sprite in visual
+      };
+      this.visuals.set(entityId, visual);
     }
 
-    // Update spatial properties
-    const screen = this.mapToScreen(mx, my)
-    visual.sprite.visible = true
-    visual.sprite.position.set(screen.x, screen.y)
+    const screen = this.mapToScreen(mx, my);
+    visual.sprite.visible = true;
+    visual.sprite.position.set(screen.x, screen.y - elev);
     
     // Z-Ordering for isometric depth
     // Map coords +Y and +X both increase depth. 10 is offset above terrain.
-    visual.sprite.zIndex = mx + my + 10
+    visual.sprite.zIndex = mx + my + elev + 10;
+
+    // Update shadow position and visibility
+    if (visual.shadowSprite) {
+      visual.shadowSprite.visible = true;
+      visual.shadowSprite.position.set(screen.x, screen.y - elev);
+      visual.shadowSprite.zIndex = mx + my + elev; // Shadows are below the building
+    }
 
     // Visual feedback for operational status
     if (hasComponent(this.world, BuildingComponent, entityId)) {
         const isOperational = BuildingComponent.isOperational[entityId] === 1
-        // Access the sprite inside the container (assuming 1st child is the sprite)
         const renderSprite = visual.sprite.children[0] as Sprite
         if (renderSprite) {
-           renderSprite.tint = isOperational ? 0xFFFFFF : 0x555555
+           // Better visual: desaturate and darken when inactive
+           if (!isOperational) {
+             renderSprite.tint = 0x556677 // Bluish dark grey
+             renderSprite.alpha = 0.7
+           } else {
+             renderSprite.tint = 0xFFFFFF
+             renderSprite.alpha = 1.0
+           }
         }
     }
   }
@@ -540,10 +759,11 @@ export class RenderingSystem {
   }
 
 
-  private removeEntityVisual(entityId: number) {
+  public removeEntityVisual(entityId: number) {
     const visual = this.visuals.get(entityId)
     if (visual?.sprite) {
       visual.sprite.destroy()
+      if (visual.shadowSprite) visual.shadowSprite.destroy() // Destroy shadow too
       this.visuals.delete(entityId)
     }
   }
@@ -590,9 +810,13 @@ export class RenderingSystem {
         }
 
         if (value > 0.1) {
+          const elevation = fbm(x * 0.08, y * 0.08, 12345, 4) // Re-calculate or fetch seed
+          const tileType = this.getTileType(x, y)
+          const elevOffset = tileType === 'water' ? 0 : Math.floor(elevation * 40)
           const screen = this.mapToScreen(x, y)
+          const sy = screen.y - elevOffset
           this.overlayGraphics
-            .poly([screen.x, screen.y - halfH, screen.x + halfW, screen.y, screen.x, screen.y + halfH, screen.x - halfW, screen.y])
+            .poly([screen.x, sy - halfH, screen.x + halfW, sy, screen.x, sy + halfH, screen.x - halfW, sy])
             .fill({ color, alpha: value * 0.5 })
         }
       }
@@ -601,11 +825,32 @@ export class RenderingSystem {
 
   // ━━━━ UTILITY ━━━━
 
+  public getElevation(x: number, y: number): number {
+    if (x < 0 || x >= this.mapW || y < 0 || y >= this.mapH) return 0
+    return (this.tileSprites[x]?.[y] as any)?.elevation || 0
+  }
+
   public reorderByDepth() { /* handled by sortableChildren */ }
 
   public getTileType(x: number, y: number): TileType | null {
     if (x < 0 || x >= this.mapW || y < 0 || y >= this.mapH) return null
     return this.tileTypes[x]?.[y] ?? null
+  }
+
+  /** Set tile type at runtime (e.g. road placement). Updates both data + visual. */
+  public setTileType(x: number, y: number, type: TileType): boolean {
+    if (x < 0 || x >= this.mapW || y < 0 || y >= this.mapH) return false
+    if (this.tileTypes[x][y] === type) return false // no change
+    
+    this.tileTypes[x][y] = type
+    
+    // Update the visual sprite
+    const elevOffset = this.getElevation(x, y)
+    const texture = TextureManager.getTileTexture(type, elevOffset)
+    if (texture && this.tileSprites[x]?.[y]) {
+      this.tileSprites[x][y].texture = texture
+    }
+    return true
   }
 
   public getBuildingAt(mapX: number, mapY: number): number | null {
@@ -627,14 +872,38 @@ export class RenderingSystem {
     return null;
   }
 
+  public canPlaceBuilding(startX: number, startY: number, size: number, ignoreEntityId?: number): boolean {
+    const intSize = Math.ceil(size);
+    for (let x = startX; x < startX + intSize; x++) {
+      for (let y = startY; y < startY + intSize; y++) {
+        // 1. Check bounds
+        if (x < 0 || x >= this.mapW || y < 0 || y >= this.mapH) return false;
+        
+        // 2. Check terrain (e.g., no water)
+        const tileType = this.getTileType(x, y);
+        if (tileType === 'water') return false;
+        
+        // 3. Check overlaps with existing buildings
+        const hitId = this.getBuildingAt(x, y);
+        if (hitId !== null && hitId !== ignoreEntityId) return false;
+      }
+    }
+    return true;
+  }
+
   public destroy() {
-    this.visuals.forEach(v => v.sprite.destroy())
+    this.visuals.forEach(v => {
+      v.sprite.destroy()
+      if (v.shadowSprite) v.shadowSprite.destroy() // Destroy shadow too
+    })
     this.visuals.clear()
     this.tileLayer.removeChildren()
     this.treeLayer.removeChildren()
+    this.shadowLayer.removeChildren() // Clear shadow layer
     this.highlightLayer.removeChildren()
     this.overlayContainer.removeChildren()
     this.entityLayer.removeChildren()
+    this.logisticsLayer.removeChildren() // Clear logistics layer
     this.mapContainer.removeChildren()
   }
 }

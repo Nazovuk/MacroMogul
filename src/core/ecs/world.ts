@@ -213,12 +213,36 @@ export function createBuilding(
   cityId: number,
   ownerId: number = 1
 ): number | undefined {
-  // Check for overlap
+  // Check for overlap considering the building's footprint
+  const buildingData = world.dataStore.getBuilding(_buildingType);
+  if (!buildingData) {
+     console.error(`[world] Failed to create building: missing data for type ${_buildingType}`);
+     return undefined;
+  }
+  
+  // Approximate footprint logic based on category
+  const getFootprintSize = () => {
+    const cat = (buildingData.type || '').toUpperCase()
+    if (cat === 'FARM') return 3.0
+    if (cat === 'FACTORY') return 4.0
+    if (cat === 'MINE') return 3.0
+    if (cat === 'WAREHOUSE') return 2.0
+    return 1.2
+  }
+  const size = Math.ceil(getFootprintSize());
+
   const query = defineQuery([Position, Building])
   const existing = query(world.ecsWorld)
+  
   for (const id of existing) {
-    if (Position.x[id] === x && Position.y[id] === y) {
-      console.warn(`[world] Cannot create building at ${x},${y}: already occupied by entity ${id}`)
+    const ex = Position.x[id]
+    const ey = Position.y[id]
+    const eSize = Building.size[id] || 1
+    
+    // AABB intersection test
+    if (x < ex + eSize && x + size > ex &&
+        y < ey + eSize && y + size > ey) {
+      console.warn(`[world] Cannot create building at ${x},${y}: bounds overlap with entity ${id}`)
       return undefined
     }
   }
@@ -254,8 +278,7 @@ export function createBuilding(
   Building.buildingTypeId[entity] = _buildingType
   Building.level[entity] = 1
   
-  const bData = world.dataStore.getBuilding(_buildingType);
-  Building.size[entity] = bData ? Math.max(1, bData.maxSize) : 1;
+  Building.size[entity] = size;
 
   Building.isOperational[entity] = 1
   
@@ -273,16 +296,16 @@ export function createBuilding(
   HumanResources.trainingBudget[entity] = 10000 // $100/mo default (Low training)
 
   // Add specific components based on type
-  if (bData?.type === BuildingType.FACTORY) {
+  if (buildingData?.type === BuildingType.FACTORY) {
       addComponent(world.ecsWorld, Factory, entity)
       // Factory.productionRate[entity] = 100
-  } else if (bData?.type === BuildingType.RETAIL || bData?.type === BuildingType.SUPERMARKET) {
+  } else if (buildingData?.type === BuildingType.RETAIL || buildingData?.type === BuildingType.SUPERMARKET) {
       addComponent(world.ecsWorld, RetailPlot, entity)
       addComponent(world.ecsWorld, RetailExpertise, entity)
       RetailExpertise.general[entity] = 50
-  } else if (bData?.name.includes('R&D') || bData?.id === 33) {
+  } else if (buildingData?.name.includes('R&D') || buildingData?.id === 33) {
       addComponent(world.ecsWorld, ResearchCenter, entity)
-  } else if (bData?.name.includes('Marketing') || bData?.id === 34) {
+  } else if (buildingData?.name.includes('Marketing') || buildingData?.id === 34) {
       addComponent(world.ecsWorld, MarketingOffice, entity)
   }
   

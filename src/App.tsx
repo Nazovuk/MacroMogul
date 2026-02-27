@@ -6,6 +6,7 @@ import {
   GameWorld, 
   runSystems, 
   createCity, 
+  createBuilding,
   createAICompany,
   createCompany,
   hireRandomExecutive,
@@ -63,6 +64,7 @@ function App() {
   const [showSettingsModal, setShowSettingsModal] = useState(false);
   const [selectedBuildingToBuild, setSelectedBuildingToBuild] = useState<BuildingData | null>(null);
   const [selectedEntityId, setSelectedEntityId] = useState<number | null>(null);
+  const [roadPlacementMode, setRoadPlacementMode] = useState(false);
 
   const startNewGame = () => {
     setGameState('scenario');
@@ -105,10 +107,16 @@ function App() {
       }
       
       console.log(`[App] Populating Cities (${CITIES.length})...`);
+      const MAP_W = 60; // Must match IsometricMap mapWidth prop
+      const MAP_H = 60; // Must match IsometricMap mapHeight prop
       CITIES.forEach((city, index) => {
         const popValue = parseFloat(city.population);
         const population = city.population.includes('M') ? Math.floor(popValue * 1000000) : Math.floor(popValue);
-        createCity(newWorld, city.x, city.y, index + 1, population);
+        // Convert percentage-based coordinates (0-100) to map grid coordinates (0-19)
+        const mapX = Math.floor((city.x / 100) * MAP_W);
+        const mapY = Math.floor((city.y / 100) * MAP_H);
+        console.log(`[App] City ${city.name}: percentage (${city.x},${city.y}) → map tile (${mapX},${mapY})`);
+        createCity(newWorld, mapX, mapY, index + 1, population);
       });
 
       console.log(`[App] Creating Player Company...`);
@@ -118,6 +126,18 @@ function App() {
       console.log(`[App] Creating AI Rivals...`);
       createAICompany(newWorld, "Global Corp", 500000000); // 5M USD in cents
       createAICompany(newWorld, "Rival Inc", 500000000); 
+
+      // ── DEBUG: Place test buildings to verify rendering pipeline ──
+      // Building type 1 = Wheat Farm, 7 = Flour Mill, 20 = Convenience Store
+      const testBuildings = [
+        { x: 18, y: 22, typeId: 1, label: 'Wheat Farm' },
+        { x: 20, y: 22, typeId: 7, label: 'Flour Mill' },
+        { x: 22, y: 22, typeId: 20, label: 'Convenience Store' },
+      ];
+      for (const tb of testBuildings) {
+        const eid = createBuilding(newWorld, tb.x, tb.y, tb.typeId, 0, playerEntity);
+        console.log(`[App] TEST BUILDING: ${tb.label} at (${tb.x},${tb.y}) → entity ${eid}`);
+      }
 
       console.log(`[App] Entering PLAYING state.`);
       setWorld(newWorld);
@@ -415,12 +435,11 @@ function App() {
         <div className="map-layer">
           {world && (
             <IsometricMap 
-              width={1200} 
-              height={700} 
               world={world} 
               selectedBuildingToBuild={selectedBuildingToBuild}
               activeOverlay={activeOverlay}
-              onPlaced={() => setSelectedBuildingToBuild(null)}
+              roadPlacementMode={roadPlacementMode}
+              onPlaced={() => { setSelectedBuildingToBuild(null); setRoadPlacementMode(false); }}
               onSelectEntity={(id) => {
                 if (id !== null) {
                   setShowDashboard(false);
@@ -524,6 +543,10 @@ function App() {
         onManagement={handleManagement}
         onMapOverlay={handleMapOverlay}
         onWorldMap={handleWorldMap}
+        onRoadMode={() => {
+          setRoadPlacementMode(prev => !prev);
+          setSelectedBuildingToBuild(null);
+        }}
       />
 
       {showSystemMenu && (

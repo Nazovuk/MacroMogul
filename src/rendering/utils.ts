@@ -1,6 +1,6 @@
 export const TILE_WIDTH = 64
 export const TILE_HEIGHT = 32
-export const TILE_DEPTH = 8
+export const TILE_DEPTH = 32
 
 export type TileType = 'grass' | 'water' | 'concrete' | 'dirt' | 'sand' | 'forest' | 'road' | 'plaza'
 
@@ -28,15 +28,18 @@ export function getTileFromNoise(elevation: number, moisture: number, dist: numb
   // Center is city
   if (urban > 0.6 + dist * 0.2) return 'concrete';
   
-  // Coastline
-  if (dist > 1.2 + hash(Math.floor(elevation*10), 0, 0)*0.1) return 'water';
+  // Coastline & Shorelines
+  const coastThreshold = 1.2 + hash(Math.floor(elevation*10), 0, 0)*0.1;
+  if (dist > coastThreshold) return 'water';
+  if (dist > coastThreshold - 0.08) return 'sand'; // Shoreline buffer
   
   // Biomes
   if (elevation < 0.2) return 'water'; // Lowlands/Swamp
+  if (elevation < 0.25) return 'sand'; // Shoreline buffer for lakes
   if (elevation > 0.8) return 'dirt'; // Mountains
   
   if (moisture > 0.6) return 'forest';
-  if (moisture < 0.3) return 'sand';
+  if (moisture < 0.3) return 'dirt';
   
   return 'grass';
 }

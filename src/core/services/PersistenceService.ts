@@ -266,10 +266,12 @@ export const PersistenceService = {
              // Building.buildingTypeId -> Data ID.
              
              // Known Entity Reference Fields:
-             const isEntityRef = (
-               (compName === 'LogisticSupply' && (prop === 'source1Id' || prop === 'source2Id' || prop === 'source3Id')) ||
-               (compName === 'Position' && prop === 'cityId') // City is an entity
-             )
+              const isEntityRef = (
+                (compName === 'LogisticSupply' && (prop === 'source1Id' || prop === 'source2Id' || prop === 'source3Id')) ||
+                (compName === 'Position' && prop === 'cityId') ||
+                (compName === 'Loan' && prop === 'lenderId') || // Lender might be a company/bank entity
+                (compName === 'CorporateBond' && prop === 'issuerId')
+              )
 
              if (isEntityRef && typeof val === 'number' && val > 0) {
                 // Try to remap
