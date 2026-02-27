@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect, useMemo, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
 import { defineQuery } from 'bitecs';
 import './TopBar.css';
@@ -25,6 +25,9 @@ interface TopBarProps {
   onOpenIntelligence?: () => void;
   onOpenLogistics?: () => void;
   onOpenHQ?: () => void;
+  onOpenAcquisition?: () => void;
+  onOpenPricing?: () => void;
+  onOpenMarketing?: () => void;
   world?: GameWorld;
 }
 
@@ -43,12 +46,30 @@ export function TopBar({
   onOpenIntelligence,
   onOpenLogistics,
   onOpenHQ,
+  onOpenAcquisition,
+  onOpenPricing,
+  onOpenMarketing,
   world
 }: TopBarProps) {
   const { t } = useTranslation();
   const [displayCash, setDisplayCash] = useState(cash);
   const [cashFlash, setCashFlash] = useState<'none' | 'green' | 'red'>('none');
   const [hoveredTab, setHoveredTab] = useState<string | null>(null);
+  const [showMoreMenu, setShowMoreMenu] = useState(false);
+  const moreMenuRef = useRef<HTMLDivElement>(null);
+
+  // Close More menu on outside click
+  useEffect(() => {
+    const handleClickOutside = (e: MouseEvent) => {
+      if (moreMenuRef.current && !moreMenuRef.current.contains(e.target as Node)) {
+        setShowMoreMenu(false);
+      }
+    };
+    if (showMoreMenu) {
+      document.addEventListener('mousedown', handleClickOutside);
+    }
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, [showMoreMenu]);
 
   // Economic Cycle Status
   const { isRecession, isBoom } = getEconomicCycle(tick);
@@ -201,15 +222,30 @@ export function TopBar({
         <div className="top-section company-section">
           <div className="company-identity">
             <div className="company-logo">
-              <svg viewBox="0 0 40 40" width="36" height="36" className="premium-logo">
+              <svg viewBox="0 0 100 100" width="46" height="46" className="premium-logo">
                 <defs>
-                  <linearGradient id="logoGrad" x1="0%" y1="0%" x2="100%" y2="100%">
-                    <stop offset="0%" stopColor="#e94560" />
-                    <stop offset="100%" stopColor="#70a1ff" />
+                  <linearGradient id="logoPrimary" x1="0%" y1="0%" x2="100%" y2="100%">
+                    <stop offset="0%" stopColor="#ff4757" />
+                    <stop offset="100%" stopColor="#c0392b" />
                   </linearGradient>
+                  <linearGradient id="logoSecondary" x1="100%" y1="100%" x2="0%" y2="0%">
+                    <stop offset="0%" stopColor="#ffffff" />
+                    <stop offset="100%" stopColor="#a4b0be" />
+                  </linearGradient>
+                  <filter id="neonShadow" x="-20%" y="-20%" width="140%" height="140%">
+                    <feDropShadow dx="0" dy="3" stdDeviation="4" floodColor="#ff4757" floodOpacity="0.6"/>
+                  </filter>
                 </defs>
-                <rect x="5" y="5" width="30" height="30" rx="8" fill="none" stroke="url(#logoGrad)" strokeWidth="2.5" />
-                <path d="M12 28V12L20 20L28 12V28" fill="none" stroke="white" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" />
+                
+                {/* Back M - Bold Red */}
+                <path d="M 12 85 L 12 25 L 35 60 L 58 25 L 58 85 L 43 85 L 43 45 L 35 57 L 27 45 L 27 85 Z" fill="url(#logoPrimary)" filter="url(#neonShadow)" />
+                
+                {/* Front M - Silver/White Interlocking */}
+                <path d="M 42 75 L 42 15 L 65 50 L 88 15 L 88 75 L 73 75 L 73 35 L 65 47 L 57 35 L 57 75 Z" fill="url(#logoSecondary)" />
+                
+                {/* Brutalist Slice effect */}
+                <polygon points="5 50, 95 5, 95 9, 5 54" fill="rgba(255, 71, 87, 0.8)" style={{ mixBlendMode: 'screen' }} />
+                <polygon points="5 65, 95 20, 95 23, 5 68" fill="rgba(255, 255, 255, 0.5)" />
               </svg>
               <div className="logo-glow"></div>
             </div>
@@ -390,7 +426,7 @@ export function TopBar({
               <div className="btn-glow"></div>
             </div>
             <div className="tab-content">
-              <span className="tab-title">{t('menu.economy')} / {t('stock.exchange_title', { defaultValue: 'BORSA' })}</span>
+              <span className="tab-title">{t('menu.economy')} / {t('stock.exchange_title')}</span>
               {companyStats && (
                 <div className="tab-metrics">
                   <span className="metric">
@@ -471,12 +507,12 @@ export function TopBar({
               <div className="btn-glow"></div>
             </div>
             <div className="tab-content">
-              <span className="tab-title">{t('menu.intelligence', { defaultValue: 'INTEL' })}</span>
+              <span className="tab-title">{t('menu.intelligence')}</span>
               {companyStats && (
                 <div className="tab-metrics">
                   <span className="metric">
                     <span className="metric-dot" style={{ background: '#8b5cf6' }}></span>
-                    {companyStats.competitorCount} {t('market.competitors', { defaultValue: 'rivals' }).toLowerCase()}
+                    {companyStats.competitorCount} {t('market.competitors').toLowerCase()}
                   </span>
                 </div>
               )}
@@ -486,39 +522,88 @@ export function TopBar({
             {hoveredTab === 'intelligence' && (
               <div className="tab-dropdown">
                 <div className="dropdown-header">
-                  <span className="dropdown-title">{t('menu.intelligence_center', { defaultValue: 'Competitive Intel' })}</span>
+                  <span className="dropdown-title">{t('menu.intelligence_center')}</span>
                 </div>
                 <div className="dropdown-section">
                    <p style={{ fontSize: '12px', color: 'rgba(255,255,255,0.6)', margin: '10px 0' }}>
-                      {t('intelligence.monitoring_signals', { defaultValue: 'Monitoring AI pricing, debt, and expansion signals...' })}
+                      {t('intelligence.monitoring')}
                    </p>
                 </div>
               </div>
             )}
           </div>
 
-          {/* Logistics Tab */}
+          {/* ══════════════════════════════════════════════
+              MORE DROPDOWN — Secondary Panels
+              M&A, Fiyatlandırma, Lojistik buraya taşındı
+              ══════════════════════════════════════════════ */}
           <div 
-            className="nav-tab logistics-tab"
-            onMouseEnter={() => setHoveredTab('logistics')}
-            onMouseLeave={() => setHoveredTab(null)}
-            onClick={() => onOpenLogistics?.()}
+            ref={moreMenuRef}
+            className={`nav-tab more-menu-tab ${showMoreMenu ? 'active' : ''}`}
+            onClick={() => setShowMoreMenu(prev => !prev)}
           >
-            <div className="premium-icon-btn" style={{ '--btn-color': '#f59e0b' } as React.CSSProperties}>
-              <span className="tab-icon">⚙️</span>
+            <div className="premium-icon-btn" style={{ '--btn-color': '#94a3b8' } as React.CSSProperties}>
+              <span className="tab-icon">☰</span>
               <div className="btn-glow"></div>
             </div>
             <div className="tab-content">
-              <span className="tab-title">{t('menu.logistics', { defaultValue: 'LOGISTICS' })}</span>
-              {companyStats && (
-                <div className="tab-metrics">
-                  <span className="metric">
-                    <span className="metric-dot" style={{ background: '#f59e0b' }}></span>
-                    {(companyStats.buildings)} {t('stats.ops', { defaultValue: 'ops' })}
-                  </span>
-                </div>
+              <span className="tab-title">Daha</span>
+              {world && world.pendingAcquisitions.filter(a => a.status === 'pending').length > 0 && (
+                <span className="more-badge">{world.pendingAcquisitions.filter(a => a.status === 'pending').length}</span>
               )}
             </div>
+
+            {/* Mega Dropdown — Click-Toggle */}
+            {showMoreMenu && (
+              <div className="tab-dropdown more-mega-dropdown" onClick={(e) => e.stopPropagation()}>
+                <div className="dropdown-header">
+                  <span className="dropdown-title">Yönetim Panelleri</span>
+                </div>
+                <div className="more-grid">
+                  {/* M&A */}
+                  <div className="more-item" onClick={() => { onOpenAcquisition?.(); setShowMoreMenu(false); }}>
+                    <div className="more-item-icon" style={{ background: 'rgba(236, 72, 153, 0.12)', color: '#ec4899' }}>🏛️</div>
+                    <div className="more-item-info">
+                      <strong>Birleşme & Satın Alma</strong>
+                      <span>Şirket değerleme, teklif yönetimi, M&A</span>
+                    </div>
+                    {world && world.pendingAcquisitions.filter(a => a.status === 'pending').length > 0 && (
+                      <span className="more-item-badge">{world.pendingAcquisitions.filter(a => a.status === 'pending').length}</span>
+                    )}
+                  </div>
+
+                  {/* Fiyatlandırma */}
+                  <div className="more-item" onClick={() => { onOpenPricing?.(); setShowMoreMenu(false); }}>
+                    <div className="more-item-icon" style={{ background: 'rgba(245, 158, 11, 0.12)', color: '#f59e0b' }}>💰</div>
+                    <div className="more-item-info">
+                      <strong>Fiyatlandırma Merkezi</strong>
+                      <span>Ürün fiyatları, strateji, pazar analizi</span>
+                    </div>
+                  </div>
+
+                  {/* Lojistik */}
+                  <div className="more-item" onClick={() => { onOpenLogistics?.(); setShowMoreMenu(false); }}>
+                    <div className="more-item-icon" style={{ background: 'rgba(59, 130, 246, 0.12)', color: '#3b82f6' }}>⚙️</div>
+                    <div className="more-item-info">
+                      <strong>Lojistik & Operasyon</strong>
+                      <span>Depo, dağıtım, tedarik zinciri</span>
+                    </div>
+                    {companyStats && (
+                      <span className="more-item-count">{companyStats.buildings} bina</span>
+                    )}
+                  </div>
+
+                  {/* Pazarlama & PR */}
+                  <div className="more-item" onClick={() => { onOpenMarketing?.(); setShowMoreMenu(false); }}>
+                    <div className="more-item-icon" style={{ background: 'rgba(34, 197, 94, 0.12)', color: '#22c55e' }}>📣</div>
+                    <div className="more-item-info">
+                      <strong>Pazarlama & PR</strong>
+                      <span>Marka değeri, itibar ve reklam yönetimi</span>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            )}
           </div>
 
           {/* Divider */}

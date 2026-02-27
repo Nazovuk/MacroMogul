@@ -15,7 +15,7 @@ import { Finances } from './core/ecs/components';
 import { TopBar } from './ui/hud/TopBar';
 import { StockTicker } from './ui/hud/StockTicker';
 import { BottomToolbar } from './ui/hud/BottomToolbar';
-import { Dashboard } from './ui/panels/Dashboard';
+
 import { BuildMenu } from './ui/components/BuildMenu';
 import { BuildingData } from './core/data/types';
 import { MainMenu } from './ui/components/MainMenu';
@@ -33,6 +33,9 @@ import { SettingsModal } from './ui/components/SettingsModal';
 import { NotificationToast } from './ui/components/NotificationToast';
 import { LogisticsDashboard } from './ui/components/LogisticsDashboard';
 import { HQDashboard } from './ui/components/HQDashboard';
+import { AcquisitionDashboard } from './ui/components/AcquisitionDashboard';
+import { PricingDashboard } from './ui/components/PricingDashboard';
+import { MarketingDashboard } from './ui/components/MarketingDashboard';
 import { PersistenceService } from './core/services/PersistenceService';
 import { CITIES } from './core/data/cities';
 import { Building } from './core/ecs/components';
@@ -47,7 +50,7 @@ function App() {
   const [error, setError] = useState<string | null>(null);
   const [isPaused, setIsPaused] = useState(false);
   const [gameSpeed, setGameSpeed] = useState(1);
-  const [showDashboard, setShowDashboard] = useState(false);
+
   const [showBuildMenu, setShowBuildMenu] = useState(false);
   const [showOverlayMenu, setShowOverlayMenu] = useState(false);
   const [showWorldMap, setShowWorldMap] = useState(false);
@@ -61,6 +64,9 @@ function App() {
   const [showIntelligenceDashboard, setShowIntelligenceDashboard] = useState(false);
   const [showLogisticsDashboard, setShowLogisticsDashboard] = useState(false);
   const [showHQDashboard, setShowHQDashboard] = useState(false);
+  const [showAcquisitionDashboard, setShowAcquisitionDashboard] = useState(false);
+  const [showPricingDashboard, setShowPricingDashboard] = useState(false);
+  const [showMarketingDashboard, setShowMarketingDashboard] = useState(false);
   const [showSettingsModal, setShowSettingsModal] = useState(false);
   const [selectedBuildingToBuild, setSelectedBuildingToBuild] = useState<BuildingData | null>(null);
   const [selectedEntityId, setSelectedEntityId] = useState<number | null>(null);
@@ -159,26 +165,17 @@ function App() {
   };
 
   const handleBuildMenu = () => {
-    setShowDashboard(false);
     setShowBuildMenu(!showBuildMenu);
     setSelectedEntityId(null); // Close firm detail panel
   };
 
-  const handleManagement = () => {
-    setShowBuildMenu(false);
-    setShowDashboard(!showDashboard);
-    setSelectedEntityId(null); // Close firm detail panel
-  };
-
   const handleMapOverlay = () => {
-    setShowDashboard(false);
     setShowBuildMenu(false);
     setShowOverlayMenu(!showOverlayMenu);
     setSelectedEntityId(null); // Close firm detail panel
   };
 
   const handleWorldMap = () => {
-    setShowDashboard(false);
     setShowBuildMenu(false);
     setShowOverlayMenu(false);
     setShowWorldMap(true);
@@ -240,7 +237,6 @@ function App() {
       const handler = () => {
           setShowSystemMenu(true);
           setIsPaused(true);
-          setShowDashboard(false);
           setShowBuildMenu(false);
           setShowOverlayMenu(false);
           setShowWorldMap(false);
@@ -264,11 +260,11 @@ function App() {
         world.cash += amount;
         setWorld({ ...world });
         
-        window.dispatchEvent(new CustomEvent('notification', { 
+        window.dispatchEvent(new CustomEvent('game-notification', { 
             detail: { message: `Approved: ${amount/100}$ loan credited to your account.`, type: 'info' } 
         }));
       } else {
-        window.dispatchEvent(new CustomEvent('notification', { 
+        window.dispatchEvent(new CustomEvent('game-notification', { 
             detail: { message: `Loan Denied: Credit limit reached.`, type: 'warning' } 
         }));
       }
@@ -303,16 +299,16 @@ function App() {
           Finances.cash[world.playerEntityId] -= recruitmentFee;
           setWorld({ ...world });
           
-          window.dispatchEvent(new CustomEvent('notification', { 
+          window.dispatchEvent(new CustomEvent('game-notification', { 
             detail: { message: `Executive recruited! Welcome to the team.`, type: 'success' } 
           }));
         } else {
-          window.dispatchEvent(new CustomEvent('notification', { 
+          window.dispatchEvent(new CustomEvent('game-notification', { 
             detail: { message: `Executive board is full.`, type: 'warning' } 
           }));
         }
       } else {
-        window.dispatchEvent(new CustomEvent('notification', { 
+        window.dispatchEvent(new CustomEvent('game-notification', { 
           detail: { message: `Insufficient funds for recruitment ($100,000 required).`, type: 'danger' } 
         }));
       }
@@ -427,6 +423,18 @@ function App() {
           setShowHQDashboard(true);
           setSelectedEntityId(null);
         }}
+        onOpenAcquisition={() => {
+          setShowAcquisitionDashboard(true);
+          setSelectedEntityId(null);
+        }}
+        onOpenPricing={() => {
+          setShowPricingDashboard(true);
+          setSelectedEntityId(null);
+        }}
+        onOpenMarketing={() => {
+          setShowMarketingDashboard(true);
+          setSelectedEntityId(null);
+        }}
       />
 
       {gameState === 'playing' && world && <StockTicker world={world} />}
@@ -439,10 +447,10 @@ function App() {
               selectedBuildingToBuild={selectedBuildingToBuild}
               activeOverlay={activeOverlay}
               roadPlacementMode={roadPlacementMode}
+              currentCityId={currentCityId}
               onPlaced={() => { setSelectedBuildingToBuild(null); setRoadPlacementMode(false); }}
               onSelectEntity={(id) => {
                 if (id !== null) {
-                  setShowDashboard(false);
                   setShowBuildMenu(false);
                 }
                 setSelectedEntityId(id);
@@ -463,26 +471,18 @@ function App() {
           </div>
         )}
 
-        {showDashboard && world && (
-          <div className="dashboard-overlay">
-            <Dashboard
-              products={Array.from(world.dataStore.products.values())}
-              buildings={Array.from(world.dataStore.buildings.values())}
-              cash={world.cash}
-              gameTick={world.tick}
-              world={world}
-              onUpgradeBuilding={handleUpgradeBuilding}
-              activeOverlay={activeOverlay}
-              onSetOverlay={setActiveOverlay}
-            />
-          </div>
-        )}
+
 
         {showBuildMenu && world && (
           <BuildMenu
             buildings={Array.from(world.dataStore.buildings.values())}
             onSelectBuilding={(building) => {
               setSelectedBuildingToBuild(building);
+              setShowBuildMenu(false);
+            }}
+            onSelectRoad={() => {
+              setRoadPlacementMode(prev => !prev);
+              setSelectedBuildingToBuild(null);
               setShowBuildMenu(false);
             }}
             onClose={() => setShowBuildMenu(false)}
@@ -521,15 +521,9 @@ function App() {
                setIsTraveling(true);
                setShowWorldMap(false);
                
-               await new Promise(r => setTimeout(r, 1500));
+               // Fake travel delay
+               await new Promise(r => setTimeout(r, 1000));
                
-               const targetCityDescriptor = CITIES.find(c => c.id === cityId);
-               const seed = targetCityDescriptor ? targetCityDescriptor.seed : 12345;
-               
-               const newWorld = createGameWorld(seed);
-               await initializeGameWorld(newWorld);
-               
-               setWorld(newWorld);
                setCurrentCityId(cityId);
                setIsTraveling(false);
              }}
@@ -540,13 +534,8 @@ function App() {
 
       <BottomToolbar
         onBuildMenu={handleBuildMenu}
-        onManagement={handleManagement}
         onMapOverlay={handleMapOverlay}
         onWorldMap={handleWorldMap}
-        onRoadMode={() => {
-          setRoadPlacementMode(prev => !prev);
-          setSelectedBuildingToBuild(null);
-        }}
       />
 
       {showSystemMenu && (
@@ -607,6 +596,27 @@ function App() {
              world={world}
              onClose={() => setShowHQDashboard(false)}
              onUpdate={() => setWorld({ ...world })}
+          />
+      )}
+
+      {showAcquisitionDashboard && world && (
+          <AcquisitionDashboard
+             world={world}
+             onClose={() => setShowAcquisitionDashboard(false)}
+          />
+      )}
+
+      {showPricingDashboard && world && (
+          <PricingDashboard
+             world={world}
+             onClose={() => setShowPricingDashboard(false)}
+          />
+      )}
+
+      {showMarketingDashboard && world && (
+          <MarketingDashboard
+             world={world}
+             onClose={() => setShowMarketingDashboard(false)}
           />
       )}
 

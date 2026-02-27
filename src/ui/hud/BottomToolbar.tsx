@@ -4,18 +4,14 @@ import './BottomToolbar.css';
 
 interface BottomToolbarProps {
   onBuildMenu: () => void;
-  onManagement: () => void;
   onMapOverlay: () => void;
   onWorldMap: () => void;
-  onRoadMode: () => void;
 }
 
 export function BottomToolbar({ 
   onBuildMenu, 
-  onManagement, 
   onMapOverlay, 
-  onWorldMap,
-  onRoadMode
+  onWorldMap
 }: BottomToolbarProps) {
   const { t } = useTranslation();
   const [activeMenu, setActiveMenu] = useState<string | null>(null);
@@ -29,15 +25,6 @@ export function BottomToolbar({
       color: '#00d9a5',
       shortcut: 'B',
       onClick: onBuildMenu,
-    },
-    {
-      id: 'manage',
-      icon: '📊',
-      label: t('menu.dashboard'),
-      description: t('menu.manage_desc'),
-      color: '#70a1ff',
-      shortcut: 'P',
-      onClick: onManagement,
     },
     {
       id: 'overlays',
@@ -56,16 +43,7 @@ export function BottomToolbar({
       color: '#e94560',
       shortcut: 'W',
       onClick: onWorldMap,
-    },
-    {
-      id: 'road',
-      icon: '🛣️',
-      label: t('menu.road', { defaultValue: 'Yol Yap' }),
-      description: t('menu.road_desc', { defaultValue: 'Bağlantı kur' }),
-      color: '#888888',
-      shortcut: 'R',
-      onClick: onRoadMode,
-    },
+    }
   ];
 
   return (

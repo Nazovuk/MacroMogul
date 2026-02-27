@@ -97,11 +97,22 @@ export const marketingSystem = (world: GameWorld) => {
       let directiveAwarenessMult = 1.0
       if (directive === 2) directiveAwarenessMult = 1.1 // Market Aggression
 
-      const rawAwarenessGrowth = spendFactorDay * campaign.awareness * demBonus.awarenessBoost * efficiencyMult * directiveAwarenessMult
+      // Brand Equity Multiplier: Higher global reputation makes ads more effective
+      const globalReputation = Company.reputation[companyId] || 50
+      const brandEquityMult = 0.8 + (globalReputation / 250) // 0.8x to 1.2x effectiveness
+
+      const rawAwarenessGrowth = spendFactorDay * campaign.awareness * demBonus.awarenessBoost * efficiencyMult * directiveAwarenessMult * brandEquityMult
       const currentAwareness = ProductBrand.awareness[brandEntity]
       const diminishingFactor = 1 - (currentAwareness / 120) 
       const finalAwarenessGrowth = Math.max(0, rawAwarenessGrowth * diminishingFactor)
       ProductBrand.awareness[brandEntity] = Math.min(100, currentAwareness + finalAwarenessGrowth)
+      
+      const cmoDir = Company.cmoDirective[companyId] || 0;
+      if (cmoDir === 1 && Math.random() < 0.08) {
+         // Corporate Trust Campaign: CMO focuses on long-term brand equity
+         // This is a premium "Management Expert" feature: building the "Moat"
+         Company.reputation[companyId] = Math.min(100, (Company.reputation[companyId] || 50) + 0.15);
+      }
     }
 
     // ─── Monthly Deep Metrics (Loyalty, Reach, PR) ───
@@ -144,11 +155,13 @@ export const marketingSystem = (world: GameWorld) => {
             // Boost reputation faster during crises to counteract bad PR
             Company.reputation[companyId] = Math.min(100, (Company.reputation[companyId] || 50) + (prPower * 5));
         }
+        
+        const cmoDir = Company.cmoDirective[companyId] || 0;
 
         // ─── DISINFORMATION CAMPAIGN (ATTACK LEADER) ───
-        // If it's a PR campaign but no internal crisis exists, and demographic is 'All' (0)
+        // If it's a PR campaign but no internal crisis exists, and demographic is 'All' (0), OR cmoDir is 3 (Aggressive)
         // It acts as a smear campaign against the market leader
-        if (demographic === 0 && spending > 500000 && (!alerts || alerts.size === 0)) {
+        if ((demographic === 0 && spending > 500000 && (!alerts || alerts.size === 0)) || cmoDir === 3) {
             // Find market leader
             let leaderId = companyId;
             let highestShare = ProductBrand.marketShare[brandEntity] || 0;
@@ -167,7 +180,8 @@ export const marketingSystem = (world: GameWorld) => {
             if (leaderId !== companyId && highestShare > 30) {
                 // Success chance based on spending vs leader's reputation
                 const leaderRep = Company.reputation[leaderId] || 50;
-                const attackPower = Math.min(0.8, spending / 10_000_000);
+                let attackPower = Math.min(0.8, spending / 10_000_000);
+                if (cmoDir === 3) attackPower += 0.2; // Extra power for explicit directive
                 
                 if (Math.random() < attackPower && leaderRep > 20) {
                     const dmg = 4 + Math.floor(Math.random() * 6); // 4-10 rep damage
@@ -226,17 +240,33 @@ export const marketingSystem = (world: GameWorld) => {
   const allBrands = brandQuery(world.ecsWorld)
 
   for (const brandId of allBrands) {
-    // Awareness decays naturally (faster if no spending, slower if loyal)
     const loyalty = ProductBrand.loyalty[brandId] || 0
-    const decayRate = 0.02 * (1 - loyalty / 200) // High loyalty slows decay
+    let decayRate = 0.02 * (1 - loyalty / 200) // High loyalty slows decay
+    
+    const companyId = ProductBrand.companyId[brandId];
+    const cmoDir = Company.cmoDirective[companyId] || 0;
+    if (cmoDir === 2) {
+       // Greenwashing builds a huge false cushion of trust, drastically reducing awareness decay
+       decayRate *= 0.25; 
+       // but it slowly eats cash every month (handled in monthly tick below, but we calculate here per-brand daily)
+       if (isNewDay) {
+           Finances.cash[companyId] -= 33333; // ~1m a month divided by 30 across all brands (simplified)
+       }
+    } else if (cmoDir === 1 && isNewDay) { // Corporate
+         Finances.cash[companyId] -= 16666; // 500k a month
+    } else if (cmoDir === 3 && isNewDay) { // Aggressive
+         Finances.cash[companyId] -= 66666; // 2m a month
+    }
 
     if (ProductBrand.awareness[brandId] > 0) {
       ProductBrand.awareness[brandId] = Math.max(0, ProductBrand.awareness[brandId] - decayRate)
     }
 
     // Loyalty decays very slowly
+    let loyaltyDecay = 0.003;
+    if (cmoDir === 3) loyaltyDecay += 0.005; // Aggressive PR turns off loyal customers over time
     if (ProductBrand.loyalty[brandId] > 0) {
-      ProductBrand.loyalty[brandId] = Math.max(0, ProductBrand.loyalty[brandId] - 0.003)
+      ProductBrand.loyalty[brandId] = Math.max(0, ProductBrand.loyalty[brandId] - loyaltyDecay)
     }
   }
 
